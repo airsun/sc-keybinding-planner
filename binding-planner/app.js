@@ -1,0 +1,1179 @@
+(function () {
+  const seed = window.VKB_PLANNER_SEED;
+  const storageKey = "sc-dual-vkb-binding-planner:v1";
+  const layers = ["base", "shift1", "shift2"];
+  const layerLabels = { base: "Base", shift1: "S1", shift2: "S2" };
+  const handLabels = { left: "左杆", right: "右杆" };
+
+  const dom = {
+    leftPanel: document.getElementById("leftPanel"),
+    rightPanel: document.getElementById("rightPanel"),
+    rows: document.getElementById("bindingRows"),
+    search: document.getElementById("searchInput"),
+    selectedTitle: document.getElementById("selectedTitle"),
+    lockBtn: document.getElementById("lockBtn"),
+    clearBtn: document.getElementById("clearBtn"),
+    noteInput: document.getElementById("noteInput"),
+    toggleCodesBtn: document.getElementById("toggleCodesBtn"),
+    exportBtn: document.getElementById("exportBtn"),
+    importInput: document.getElementById("importInput"),
+    codeDialog: document.getElementById("codeDialog"),
+    codeDialogKicker: document.getElementById("codeDialogKicker"),
+    codeDialogTitle: document.getElementById("codeDialogTitle"),
+    codeDialogFields: document.getElementById("codeDialogFields"),
+    saveCodeBtn: document.getElementById("saveCodeBtn"),
+    copyCodeBtn: document.getElementById("copyCodeBtn"),
+    recalcCodeBtn: document.getElementById("recalcCodeBtn"),
+  };
+
+  let state = loadState();
+  let selectedRowId = state.uiSettings.selectedRowId || null;
+  let searchText = "";
+  let codeEditTarget = null;
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function loadState() {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.schemaVersion === 1) {
+          return {
+            schemaVersion: 1,
+            profileName: parsed.profileName || seed.profileName,
+            deviceConfig: parsed.deviceConfig || clone(seed.deviceConfig),
+            bindings: parsed.bindings || {},
+            uiSettings: { ...seed.uiSettings, ...(parsed.uiSettings || {}) },
+          };
+        }
+      } catch (error) {
+        console.warn("Ignoring invalid saved state", error);
+      }
+    }
+    const bindings = {};
+    for (const binding of seed.defaultBindings) {
+      bindings[binding.actionKey] = clone(binding);
+    }
+    return {
+      schemaVersion: 1,
+      profileName: seed.profileName,
+      deviceConfig: clone(seed.deviceConfig),
+      bindings,
+      uiSettings: clone(seed.uiSettings),
+    };
+  }
+
+  function saveState() {
+    state.uiSettings.selectedRowId = selectedRowId;
+    localStorage.setItem(storageKey, JSON.stringify(state));
+  }
+
+  function allRows() {
+    return [...seed.scenarioRows, ...seed.gameRows];
+  }
+
+  function currentRows() {
+    return state.uiSettings.activeList === "game" ? seed.gameRows : seed.scenarioRows;
+  }
+
+  function findRow(rowId) {
+    return allRows().find((row) => row.id === rowId) || null;
+  }
+
+  function getControl(hand, controlId) {
+    return state.deviceConfig.hands[hand].controls.find((control) => control.id === controlId);
+  }
+
+  function getLayerForHand(hand) {
+    return state.uiSettings.layers?.[hand] || "base";
+  }
+
+  function setLayerForHand(hand, layer) {
+    state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
+    state.uiSettings.layers[hand] = layer;
+    saveState();
+    render();
+  }
+
+  function normalizeSlot(hand, controlId) {
+    const control = getControl(hand, controlId);
+    if (!control || control.bindable === false) return null;
+    if (control.kind === "axis") {
+      return { slotType: "axis", hand, control: controlId };
+    }
+    return {
+      slotType: "button",
+      hand,
+      control: controlId,
+      layer: control.shiftCapable ? getLayerForHand(hand) : "base",
+    };
+  }
+
+  function slotKey(slot) {
+    if (!slot) return "";
+    if (slot.slotType === "axis") return `${slot.hand}:${slot.control}:axis`;
+    return `${slot.hand}:${slot.control}:${slot.layer || "base"}`;
+  }
+
+  function sameSlot(a, b) {
+    return slotKey(a) === slotKey(b);
+  }
+
+  function codeForSlot(slot) {
+    if (!slot) return "";
+    const control = getControl(slot.hand, slot.control);
+    if (!control) return "";
+    if (slot.slotType === "axis") return control.axisCode || "--";
+    const layer = slot.layer || "base";
+    const value = layer === "shift1" ? control.shift1Button : layer === "shift2" ? control.shift2Button : control.baseButton;
+    if (value === null || value === undefined || value === "") return "--";
+    return typeof value === "number" ? `#${String(value)}` : String(value);
+  }
+
+  function compactCodeForSlot(slot) {
+    const code = codeForSlot(slot);
+    if (!slot || !code) return code;
+    const povSuffix = {
+      A1_pov_up: "A1↑",
+      A1_pov_down: "A1↓",
+      A1_pov_left: "A1←",
+      A1_pov_right: "A1→",
+    };
+    if (povSuffix[slot.control]) return povSuffix[slot.control];
+    return String(code)
+      .replace(/^[LR]_?/, "")
+      .replace(/^A1_AXIS_/, "A1")
+      .replace(/^AXIS_/, "")
+      .replace(/_POV_/g, "")
+      .replace(/_UP$/g, "↑")
+      .replace(/_DOWN$/g, "↓")
+      .replace(/_LEFT$/g, "←")
+      .replace(/_RIGHT$/g, "→");
+  }
+
+  function slotLabel(slot) {
+    if (!slot) return "";
+    const control = getControl(slot.hand, slot.control);
+    if (!control) return "未知控件";
+    if (slot.slotType === "axis") return control.label;
+    return control.label;
+  }
+
+  function slotText(slot) {
+    if (!slot) return "未分配";
+    const code = codeForSlot(slot);
+    return `${slotLabel(slot)} ${state.uiSettings.showCodes ? code : ""}`.trim();
+  }
+
+  function bindingForRow(row) {
+    return state.bindings[row.actionKey] || null;
+  }
+
+  function occupancy() {
+    const map = new Map();
+    for (const binding of Object.values(state.bindings)) {
+      if (!binding.enabled || !binding.slot) continue;
+      const key = slotKey(binding.slot);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(binding);
+    }
+    return map;
+  }
+
+  function slotStatus(slot, occupancyMap) {
+    const control = getControl(slot.hand, slot.control);
+    const occupants = occupancyMap.get(slotKey(slot)) || [];
+    const code = codeForSlot(slot);
+    return {
+      occupied: occupants.length > 0,
+      locked: occupants.some((item) => item.locked),
+      conflict: occupants.length > 1,
+      uncalibrated: code === "--",
+      current: selectedRowId ? occupants.some((item) => item.actionKey === findRow(selectedRowId)?.actionKey) : false,
+      disabled: !control || control.bindable === false,
+    };
+  }
+
+  function statusForRow(row, occupancyMap) {
+    const binding = bindingForRow(row);
+    if (!binding || !binding.slot) return { key: "unbound", label: "未分配", tone: "muted" };
+    const current = occupancyMap.get(slotKey(binding.slot)) || [];
+    if (current.length > 1) return { key: "issue", reason: "conflict", label: "冲突", tone: "red", conflictCount: current.length };
+    if (codeForSlot(binding.slot) === "--") return { key: "issue", reason: "uncalibrated", label: "未校准", tone: "red" };
+    if (binding.locked) return { key: "locked", label: "已确认", tone: "green" };
+    return { key: "bound", label: "已绑定", tone: "green" };
+  }
+
+  function makeEl(tag, className, text) {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    if (text !== undefined) el.textContent = text;
+    return el;
+  }
+
+  function toastHost() {
+    let host = document.getElementById("toastHost");
+    if (!host) {
+      host = makeEl("div", "toast-host");
+      host.id = "toastHost";
+      host.setAttribute("aria-live", "polite");
+      document.body.append(host);
+    }
+    return host;
+  }
+
+  function showToast(message, options = {}) {
+    const host = toastHost();
+    const toast = makeEl("div", `toast ${options.tone || "info"}`.trim());
+    toast.setAttribute("role", "status");
+    toast.append(makeEl("div", "toast-message", message));
+
+    let dismissTimer = null;
+    const dismiss = () => {
+      clearTimeout(dismissTimer);
+      toast.classList.remove("show");
+      toast.classList.add("hide");
+      window.setTimeout(() => toast.remove(), 180);
+    };
+
+    if (options.actionLabel && typeof options.onAction === "function") {
+      const actions = makeEl("div", "toast-actions");
+      const action = makeEl("button", "toast-action primary", options.actionLabel);
+      action.type = "button";
+      action.addEventListener("click", (event) => {
+        event.stopPropagation();
+        dismiss();
+        options.onAction();
+      });
+      actions.append(action);
+      if (options.cancelLabel) {
+        const cancel = makeEl("button", "toast-action", options.cancelLabel);
+        cancel.type = "button";
+        cancel.addEventListener("click", (event) => {
+          event.stopPropagation();
+          dismiss();
+        });
+        actions.append(cancel);
+      }
+      toast.append(actions);
+    }
+
+    host.append(toast);
+    window.requestAnimationFrame(() => toast.classList.add("show"));
+    dismissTimer = window.setTimeout(dismiss, options.duration || (options.actionLabel ? 7000 : 2600));
+    return dismiss;
+  }
+
+  function renderStickPanel(hand) {
+    const panel = hand === "left" ? dom.leftPanel : dom.rightPanel;
+    const title = hand === "left" ? "L 左杆" : "R 右杆";
+    const layer = getLayerForHand(hand);
+    const controls = state.deviceConfig.hands[hand].controls;
+    const occ = occupancy();
+
+    panel.replaceChildren();
+    const head = makeEl("div", "stick-head");
+    const titleRow = makeEl("div", "stick-title");
+    titleRow.append(makeEl("span", "", title));
+    titleRow.append(makeEl("span", "tag", state.deviceConfig.hands[hand].deviceId));
+    head.append(titleRow);
+
+    const layerSwitch = makeEl("div", "layer-switch");
+    for (const item of layers) {
+      const button = makeEl("button", item === layer ? "active" : "", layerLabels[item]);
+      button.type = "button";
+      button.addEventListener("click", () => setLayerForHand(hand, item));
+      layerSwitch.append(button);
+    }
+    head.append(layerSwitch);
+    panel.append(head);
+
+    renderTriggerGroup(panel, hand, controls, occ);
+    renderA1Group(panel, hand, controls, occ);
+    renderHatGroup(panel, hand, controls, occ);
+    renderAxisGroup(panel, hand, controls, occ);
+    renderBaseGroup(panel, hand, controls, occ);
+  }
+
+  function controlsByIds(controls, ids) {
+    return ids.map((id) => controls.find((control) => control.id === id)).filter(Boolean);
+  }
+
+  function groupWrap(title, tone) {
+    const group = makeEl("section", `control-group ${tone || ""}`.trim());
+    group.append(makeEl("div", "group-title", title));
+    return group;
+  }
+
+  function renderTriggerGroup(panel, hand, controls, occ) {
+    const group = groupWrap("TRIGGER CHAIN", "group-trigger");
+    const grid = makeEl("div", "slot-grid trigger-grid");
+    for (const control of controlsByIds(controls, ["trigger_s1", "trigger_s2", "rapid_fire_pull", "rapid_fire_push", "A2"])) {
+      const slot = renderSlot(hand, control, occ);
+      const triggerClass = {
+        trigger_s1: "trigger-trg1",
+        trigger_s2: "trigger-trg2",
+        rapid_fire_pull: "trigger-rf-pull",
+        rapid_fire_push: "trigger-rf-push",
+        A2: "trigger-a2",
+      }[control.id];
+      if (triggerClass) slot.classList.add(triggerClass);
+      grid.append(slot);
+    }
+    group.append(grid);
+    panel.append(group);
+  }
+
+  function renderA1Group(panel, hand, controls, occ) {
+    const group = groupWrap("A1 MINI", "group-a1");
+    const axisTitle = makeEl("div", "control-subtitle", "AXIS");
+    group.append(axisTitle);
+    const axisGrid = makeEl("div", "slot-grid axis-grid");
+    for (const control of controlsByIds(controls, ["A1_axis_x", "A1_axis_y"])) {
+      axisGrid.append(renderSlot(hand, control, occ));
+    }
+    group.append(axisGrid);
+    const povTitle = makeEl("div", "control-subtitle", "POV");
+    group.append(povTitle);
+    const hat = makeEl("div", "hat a1-pov");
+    const povMap = { up: "A1_pov_up", down: "A1_pov_down", left: "A1_pov_left", right: "A1_pov_right" };
+    for (const [position, id] of Object.entries(povMap)) {
+      const control = controls.find((item) => item.id === id);
+      const slot = renderSlot(hand, control, occ);
+      slot.classList.add(position);
+      hat.append(slot);
+    }
+    group.append(hat);
+    panel.append(group);
+  }
+
+  function renderHatGroup(panel, hand, controls, occ) {
+    const group = groupWrap("HATS", "group-hats");
+    const modules = makeEl("div", "hat-strips");
+    for (const hatName of ["A3", "A4", "C1"]) {
+      const module = makeEl("div", "hat-strip");
+      const title = makeEl("div", "hat-strip-title", hatName);
+      module.append(title);
+      const hat = makeEl("div", "hat-strip-grid");
+      for (const position of ["up", "left", "press", "right", "down"]) {
+        const control = controls.find((item) => item.id === `${hatName}_${position}`);
+        const slot = renderSlot(hand, control, occ);
+        slot.classList.add(position, "hat-chip");
+        hat.append(slot);
+      }
+      module.append(hat);
+      modules.append(module);
+    }
+    group.append(modules);
+    panel.append(group);
+  }
+
+  function renderAxisGroup(panel, hand, controls, occ) {
+    const group = groupWrap("6DOF AXIS", "group-axis");
+    const grid = makeEl("div", "slot-grid axis-grid");
+    for (const control of controlsByIds(controls, ["main_x", "main_y", "main_twist"])) {
+      grid.append(renderSlot(hand, control, occ));
+    }
+    group.append(grid);
+    panel.append(group);
+  }
+
+  function renderBaseGroup(panel, hand, controls, occ) {
+    const group = groupWrap("BASE PANEL", "group-base");
+
+    const board = makeEl("div", "base-panel-board");
+    const functionRow = makeEl("div", "slot-grid base-function-row");
+    for (const control of controlsByIds(controls, ["base_f2", "base_f1", "base_f3"])) {
+      functionRow.append(renderSlot(hand, control, occ));
+    }
+    board.append(functionRow);
+
+    const lowerRow = makeEl("div", "base-lower-row");
+
+    const swBlock = makeEl("div", "base-subgroup base-sw");
+    swBlock.append(makeEl("div", "base-subtitle", "SW"));
+    const swGrid = makeEl("div", "slot-grid base-sw-grid");
+    for (const control of controlsByIds(controls, ["sw1_up", "sw1_down"])) {
+      swGrid.append(renderSlot(hand, control, occ));
+    }
+    swBlock.append(swGrid);
+    lowerRow.append(swBlock);
+
+    const throttleBlock = makeEl("div", "base-subgroup base-throttle");
+    throttleBlock.append(makeEl("div", "base-subtitle", "THROTTLE"));
+    const throttleGrid = makeEl("div", "slot-grid base-throttle-grid");
+    throttleGrid.append(renderSlot(hand, controls.find((item) => item.id === "throttle_axis"), occ));
+    throttleBlock.append(throttleGrid);
+    lowerRow.append(throttleBlock);
+
+    const encoderBlock = makeEl("div", "base-subgroup base-encoder");
+    encoderBlock.append(makeEl("div", "base-subtitle", "ENCODER"));
+    const encoderGrid = makeEl("div", "slot-grid base-encoder-grid");
+    for (const control of controlsByIds(controls, ["encoder_ccw", "encoder_cw"])) {
+      encoderGrid.append(renderSlot(hand, control, occ));
+    }
+    encoderBlock.append(encoderGrid);
+    lowerRow.append(encoderBlock);
+
+    board.append(lowerRow);
+    group.append(board);
+    panel.append(group);
+  }
+
+  function renderSlot(hand, control, occupancyMap) {
+    const slot = control.kind === "axis"
+      ? { slotType: "axis", hand, control: control.id }
+      : { slotType: "button", hand, control: control.id, layer: control.shiftCapable ? getLayerForHand(hand) : "base" };
+    const status = slotStatus(slot, occupancyMap);
+    const button = makeEl("button", `slot ${control.kind || "button"}`);
+    button.type = "button";
+    button.dataset.hand = hand;
+    button.dataset.control = control.id;
+    for (const className of ["occupied", "locked", "conflict", "uncalibrated", "current"]) {
+      if (status[className]) button.classList.add(className);
+    }
+    button.title = `${handLabels[hand]} · ${control.label}`;
+
+    const label = makeEl("span", "slot-label", control.label);
+    button.append(label);
+    if (state.uiSettings.showCodes) {
+      button.append(makeEl("span", "slot-code", compactCodeForSlot(slot)));
+    }
+    button.append(renderOccupancyBars(hand, control, occupancyMap));
+
+    const edit = makeEl("button", "code-edit");
+    edit.type = "button";
+    edit.title = "编辑编码";
+    edit.setAttribute("aria-label", "编辑编码");
+    edit.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openCodeDialog(hand, control.id);
+    });
+    button.append(edit);
+
+    button.addEventListener("click", () => bindSelectedToSlot(hand, control.id));
+    return button;
+  }
+
+  function renderOccupancyBars(hand, control, occupancyMap) {
+    const bars = makeEl("div", "occupancy");
+    for (const layer of layers) {
+      const span = document.createElement("span");
+      if (control.kind === "axis" && layer !== "base") {
+        span.style.opacity = "0.18";
+      }
+      if (!control.shiftCapable && layer !== "base") {
+        span.style.opacity = "0.18";
+      }
+      const slot = control.kind === "axis"
+        ? { slotType: "axis", hand, control: control.id }
+        : { slotType: "button", hand, control: control.id, layer: control.shiftCapable ? layer : "base" };
+      const occupants = occupancyMap.get(slotKey(slot)) || [];
+      if (occupants.length) span.classList.add("on");
+      if (occupants.some((item) => item.locked)) span.classList.add("locked");
+      bars.append(span);
+    }
+    return bars;
+  }
+
+  function renderRows() {
+    const rows = currentRows();
+    const occ = occupancy();
+    const filter = state.uiSettings.statusFilter || "all";
+    const query = searchText.trim().toLowerCase();
+    dom.rows.replaceChildren();
+
+    let currentGroup = "";
+    let visibleCount = 0;
+    for (const row of rows) {
+      const status = statusForRow(row, occ);
+      if (filter !== "all") {
+        if (filter === "bound" && status.key !== "bound" && status.key !== "locked") continue;
+        if (filter === "unbound" && status.key !== "unbound") continue;
+        if (filter === "locked" && status.key !== "locked") continue;
+        if (filter === "issue" && status.key !== "issue") continue;
+      }
+      const haystack = `${row.nameZh} ${row.nameEn} ${row.description} ${row.suggestedInput} ${row.actionId}`.toLowerCase();
+      if (query && !haystack.includes(query)) continue;
+
+      if (row.group !== currentGroup) {
+        currentGroup = row.group;
+        const groupRow = makeEl("div", "card-group");
+        groupRow.innerHTML = `<span>${escapeHtml(currentGroup)}</span>`;
+        dom.rows.append(groupRow);
+      }
+      dom.rows.append(renderBindingCard(row, status));
+      visibleCount += 1;
+    }
+
+    if (!visibleCount) {
+      dom.rows.append(makeEl("div", "empty-card", "没有匹配的动作。"));
+    }
+  }
+
+  function renderBindingCard(row, status) {
+    const binding = bindingForRow(row);
+    const card = document.createElement("article");
+    card.className = "binding-card";
+    card.dataset.rowId = row.id;
+    if (row.id === selectedRowId) card.classList.add("selected");
+    if (binding?.locked) card.classList.add("locked-card");
+    if (status.reason === "conflict") card.classList.add("has-conflict");
+    card.addEventListener("click", () => focusBinding(row));
+
+    const actionCell = makeEl("div", "card-action");
+    const primary = row.nameZh || row.nameEn || row.actionId || "未命名动作";
+    const secondary = row.nameZh && row.nameEn ? row.nameEn : row.actionId || row.activationMode || "";
+    const titleRow = makeEl("div", "action-title-row");
+    titleRow.append(makeEl("div", "action-name", primary));
+    if (binding) titleRow.append(renderCardNotePopover(row, binding));
+    actionCell.append(titleRow);
+    if (secondary) actionCell.append(makeEl("div", "action-sub", secondary));
+    if (row.subgroup) actionCell.append(makeEl("div", "action-sub", row.subgroup));
+
+    const desc = makeEl("div", "card-description");
+    desc.append(makeEl("span", "card-description-text", row.description || row.actionText || row.suggestedInput || "—"));
+
+    const meta = renderBindingConsole(row, binding, status);
+
+    card.append(actionCell, desc, meta);
+    return card;
+  }
+
+  function renderBindingConsole(row, binding, status) {
+    const consoleEl = makeEl("div", "binding-console");
+    if (binding?.slot && status.reason === "conflict") consoleEl.classList.add("has-conflict");
+    const statusRail = makeEl("div", `status-rail ${status.tone || "muted"}`.trim());
+    statusRail.title = status.label;
+    if (binding?.note) statusRail.classList.add("noted");
+    consoleEl.append(statusRail);
+
+    if (binding?.slot && status.reason === "conflict") {
+      consoleEl.append(renderConflictMiniCard(binding, status));
+    }
+
+    const controls = makeEl("div", "binding-controls");
+    controls.append(renderHandSegment(row, binding));
+    controls.append(renderLayerSegment(row, binding));
+    controls.append(renderSlotButton(row, binding, status));
+    controls.append(renderCardLockButton(row, binding));
+    consoleEl.append(controls);
+    return consoleEl;
+  }
+
+  function renderConflictMiniCard(binding, status) {
+    const slot = binding.slot;
+    const conflicts = conflictingBindingsFor(binding);
+    const removable = conflicts.filter((item) => !item.locked);
+    const locked = conflicts.filter((item) => item.locked);
+    const card = makeEl("div", "conflict-mini-card");
+    card.title = conflicts.length
+      ? `冲突：${conflicts.map((item) => displayNameForAction(item.actionKey)).join("、")}`
+      : "当前键位被多个动作占用";
+    const meta = makeEl("div", "conflict-mini-meta");
+    const side = handLabels[slot.hand] || slot.hand;
+    const layer = slot.slotType === "axis" ? "Axis" : layerLabels[slot.layer || "base"];
+    meta.append(makeEl("span", "conflict-mini-tag", "冲突键位"));
+    meta.append(makeEl("span", "conflict-mini-count", `x${status.conflictCount || 2}`));
+    const main = makeEl("div", "conflict-mini-main", slotLabel(slot));
+    const code = makeEl("div", "conflict-mini-code", `${side} · ${layer} · ${state.uiSettings.showCodes ? compactCodeForSlot(slot) : codeForSlot(slot)}`);
+    const action = makeEl("button", "conflict-mini-action", removable.length ? "解绑其它" : "锁定中");
+    action.type = "button";
+    action.disabled = !removable.length;
+    action.title = removable.length
+      ? `解绑 ${removable.length} 个未锁定冲突绑定`
+      : "其它冲突绑定已锁定，需先解除锁定";
+    if (locked.length) action.classList.add("has-locked");
+    action.addEventListener("click", (event) => {
+      event.stopPropagation();
+      resolveBindingConflict(binding);
+    });
+    card.append(meta, main, code, action);
+    return card;
+  }
+
+  function conflictingBindingsFor(binding) {
+    if (!binding?.slot) return [];
+    return (occupancy().get(slotKey(binding.slot)) || []).filter((item) => item.actionKey !== binding.actionKey);
+  }
+
+  function resolveBindingConflict(binding) {
+    const conflicts = conflictingBindingsFor(binding);
+    const removable = conflicts.filter((item) => !item.locked);
+    const locked = conflicts.filter((item) => item.locked);
+    if (!removable.length) {
+      showToast("其它冲突绑定已锁定，先解除锁定再解绑。", { tone: "warn" });
+      return;
+    }
+    for (const item of removable) {
+      delete state.bindings[item.actionKey];
+    }
+    const row = allRows().find((item) => item.actionKey === binding.actionKey);
+    if (row) selectedRowId = row.id;
+    saveState();
+    render();
+    if (locked.length) showToast("已解绑未锁定冲突；仍有锁定冲突需要手动解除。", { tone: "warn" });
+  }
+
+  function renderHandSegment(row, binding) {
+    const segment = makeEl("div", "seg hand-seg");
+    for (const hand of ["left", "right"]) {
+      const button = makeEl("button", binding?.slot?.hand === hand ? "active" : "", hand === "left" ? "L" : "R");
+      button.type = "button";
+      button.title = handLabels[hand];
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        setBindingHand(row, hand);
+      });
+      segment.append(button);
+    }
+    return segment;
+  }
+
+  function renderLayerSegment(row, binding) {
+    const segment = makeEl("div", "seg layer-seg");
+    const control = binding?.slot ? getControl(binding.slot.hand, binding.slot.control) : null;
+    for (const layer of layers) {
+      const isAxis = binding?.slot?.slotType === "axis";
+      const disabled = isAxis || (control && !control.shiftCapable && layer !== "base");
+      const active = binding?.slot?.slotType === "axis"
+        ? layer === "base"
+        : (binding?.slot?.layer || "base") === layer;
+      const button = makeEl("button", active ? "active" : "", layerLabels[layer]);
+      button.type = "button";
+      button.disabled = disabled;
+      button.title = isAxis ? "Axis 不使用 Shift 层" : layerLabels[layer];
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        setBindingLayer(row, layer);
+      });
+      segment.append(button);
+    }
+    return segment;
+  }
+
+  function renderSlotButton(row, binding, status) {
+    const button = makeEl("div", `slot-pill ${status.tone || "muted"}`.trim());
+    button.role = "button";
+    button.tabIndex = 0;
+    button.title = binding?.slot ? "选中并在两侧键位区定位" : "选中后从左右键位区点选";
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      focusBinding(row);
+    });
+    button.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      focusBinding(row);
+    });
+
+    const light = makeEl("span", `status-dot-ui ${status.tone || "muted"}`.trim());
+    const label = makeEl("span", "slot-pill-label", binding?.slot ? slotLabel(binding.slot) : "点选键位");
+    const code = makeEl("span", "slot-pill-code", binding?.slot && state.uiSettings.showCodes ? compactCodeForSlot(binding.slot) : status.label);
+    button.append(light, label, code);
+    return button;
+  }
+
+  function renderCardNotePopover(row, binding) {
+    const popover = makeEl("div", binding.note ? "card-note-popover has-note" : "card-note-popover");
+    const toggle = makeEl("button", "card-note-icon", "!");
+    toggle.type = "button";
+    toggle.title = binding.note ? "查看或编辑备注" : "添加备注";
+    toggle.setAttribute("aria-label", toggle.title);
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const isOpen = popover.classList.toggle("open");
+      toggle.setAttribute("aria-expanded", String(isOpen));
+      if (isOpen) {
+        input.focus();
+        input.select();
+      }
+    });
+
+    const panel = makeEl("div", "card-note-panel");
+    panel.addEventListener("click", (event) => event.stopPropagation());
+    panel.addEventListener("pointerdown", (event) => event.stopPropagation());
+    const input = makeEl("input", "card-note-input");
+    input.type = "text";
+    input.value = binding.note || "";
+    input.placeholder = "备注";
+    input.title = "编辑备注";
+    input.addEventListener("input", (event) => {
+      updateRowNote(row, event.target.value, { syncSelection: row.id === selectedRowId });
+      popover.classList.toggle("has-note", Boolean(event.target.value.trim()));
+    });
+    input.addEventListener("change", (event) => {
+      updateRowNote(row, event.target.value, { syncSelection: row.id === selectedRowId, renderRowsAfter: true });
+    });
+    panel.append(input);
+    popover.append(toggle, panel);
+    return popover;
+  }
+
+  function renderCardLockButton(row, binding) {
+    const button = makeEl("button", binding?.locked ? "card-lock active" : "card-lock");
+    button.type = "button";
+    button.disabled = !binding;
+    setLockButtonVisual(button, Boolean(binding?.locked), binding?.locked ? "解除锁定" : "锁定当前绑定");
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleRowLock(row);
+    });
+    return button;
+  }
+
+  function setLockButtonVisual(button, locked, title) {
+    const icon = makeEl("span", locked ? "lock-icon locked" : "lock-icon");
+    icon.setAttribute("aria-hidden", "true");
+    const text = makeEl("span", "sr-only", locked ? "解除锁定" : "锁定");
+    button.replaceChildren(icon, text);
+    button.classList.toggle("active", locked);
+    button.title = title || (locked ? "解除锁定" : "锁定当前绑定");
+    button.setAttribute("aria-label", locked ? "解除锁定" : "锁定当前绑定");
+    button.setAttribute("aria-pressed", String(locked));
+  }
+
+  function metaField(label, value, tone) {
+    const field = makeEl("div", "meta-field");
+    field.append(makeEl("span", "meta-label", label));
+    field.append(statusTag(value, tone));
+    return field;
+  }
+
+  function statusTag(text, tone) {
+    return makeEl("span", `tag ${tone || ""}`.trim(), text);
+  }
+
+  function selectRow(rowId) {
+    selectedRowId = rowId;
+    saveState();
+    render();
+  }
+
+  function focusBinding(row) {
+    selectedRowId = row.id;
+    const binding = bindingForRow(row);
+    if (binding?.slot?.slotType === "button") {
+      state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
+      state.uiSettings.layers[binding.slot.hand] = binding.slot.layer || "base";
+    }
+    saveState();
+    render();
+  }
+
+  function setBindingHand(row, hand) {
+    selectedRowId = row.id;
+    const binding = bindingForRow(row);
+    if (!binding?.slot) {
+      state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
+      state.uiSettings.layers[hand] = state.uiSettings.layers[hand] || "base";
+      saveState();
+      render();
+      return;
+    }
+    if (binding.slot.hand === hand) {
+      focusBinding(row);
+      return;
+    }
+    if (binding.locked) {
+      showToast("这个绑定已锁定，先解除锁定再修改。", { tone: "warn" });
+      return;
+    }
+    const control = getControl(hand, binding.slot.control);
+    if (!control || control.bindable === false) {
+      showToast("另一侧没有对应的可绑定控件。", { tone: "warn" });
+      return;
+    }
+    const slot = { ...binding.slot, hand };
+    if (slot.slotType === "button" && !control.shiftCapable) slot.layer = "base";
+    setBindingSlot(row, slot);
+  }
+
+  function setBindingLayer(row, layer) {
+    selectedRowId = row.id;
+    const binding = bindingForRow(row);
+    if (!binding?.slot) {
+      state.uiSettings.layers = { ...(state.uiSettings.layers || { left: "base", right: "base" }), left: layer, right: layer };
+      saveState();
+      render();
+      return;
+    }
+    if (binding.slot.slotType === "axis") {
+      focusBinding(row);
+      return;
+    }
+    if ((binding.slot.layer || "base") === layer) {
+      focusBinding(row);
+      return;
+    }
+    if (binding.locked) {
+      showToast("这个绑定已锁定，先解除锁定再修改。", { tone: "warn" });
+      return;
+    }
+    const control = getControl(binding.slot.hand, binding.slot.control);
+    if (!control?.shiftCapable && layer !== "base") return;
+    setBindingSlot(row, { ...binding.slot, layer });
+  }
+
+  function setBindingSlot(row, slot, options = {}) {
+    const existing = state.bindings[row.actionKey];
+    if (existing?.locked && !sameSlot(existing.slot, slot)) {
+      showToast("这个绑定已锁定，先解除锁定再修改。", { tone: "warn" });
+      return false;
+    }
+    if (existing?.slot && sameSlot(existing.slot, slot)) {
+      focusBinding(row);
+      return true;
+    }
+
+    const occ = occupancy();
+    const occupants = (occ.get(slotKey(slot)) || []).filter((item) => item.actionKey !== row.actionKey);
+    if (occupants.some((item) => item.locked)) {
+      showToast("这个键位已经锁定，先解除锁定再修改。", { tone: "warn" });
+      return false;
+    }
+    if (occupants.length && !options.replaceConflicts) {
+      const names = occupants.map((item) => displayNameForAction(item.actionKey)).join("、");
+      showToast(`该键位已被 ${names} 占用。`, {
+        tone: "warn",
+        actionLabel: "替换",
+        cancelLabel: "取消",
+        duration: 7200,
+        onAction: () => setBindingSlot(row, slot, { replaceConflicts: true }),
+      });
+      return false;
+    }
+    if (occupants.length) {
+      for (const item of occupants) {
+        delete state.bindings[item.actionKey];
+      }
+    }
+
+    state.bindings[row.actionKey] = {
+      actionKey: row.actionKey,
+      slot,
+      enabled: true,
+      locked: existing?.locked || false,
+      note: existing?.note || "",
+    };
+    selectedRowId = row.id;
+    if (slot.slotType === "button") {
+      state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
+      state.uiSettings.layers[slot.hand] = slot.layer || "base";
+    }
+    saveState();
+    render();
+    return true;
+  }
+
+  function renderSelectionBar() {
+    const row = findRow(selectedRowId);
+    if (!row) {
+      dom.selectedTitle.textContent = "选择一行动作，然后点击左右摇杆键位";
+      dom.lockBtn.disabled = true;
+      setLockButtonVisual(dom.lockBtn, false, "先选择动作");
+      dom.clearBtn.disabled = true;
+      dom.clearBtn.title = "先选择动作";
+      dom.noteInput.disabled = true;
+      dom.noteInput.value = "";
+      return;
+    }
+    const binding = bindingForRow(row);
+    dom.selectedTitle.textContent = `${row.nameZh || row.nameEn} ${binding?.slot ? "→ " + handLabels[binding.slot.hand] + " · " + slotText(binding.slot) : "→ 未分配"}`;
+    dom.lockBtn.disabled = !binding;
+    dom.clearBtn.disabled = !binding;
+    dom.clearBtn.title = binding ? "解绑当前动作" : "先绑定键位";
+    dom.noteInput.disabled = !binding;
+    setLockButtonVisual(dom.lockBtn, Boolean(binding?.locked), binding?.locked ? "解除锁定" : "锁定当前绑定");
+    dom.noteInput.value = binding?.note || "";
+  }
+
+  function bindSelectedToSlot(hand, controlId) {
+    const row = findRow(selectedRowId);
+    if (!row) {
+      showToast("先选择一行动作。", { tone: "warn" });
+      return;
+    }
+    const slot = normalizeSlot(hand, controlId);
+    if (!slot) return;
+    setBindingSlot(row, slot);
+  }
+
+  function displayNameForAction(actionKey) {
+    const row = allRows().find((item) => item.actionKey === actionKey);
+    return row ? row.nameZh || row.nameEn || actionKey : actionKey;
+  }
+
+  function toggleLock() {
+    const row = findRow(selectedRowId);
+    if (!row) return;
+    const binding = state.bindings[row.actionKey];
+    if (!binding) return;
+    binding.locked = !binding.locked;
+    saveState();
+    render();
+  }
+
+  function toggleRowLock(row) {
+    selectedRowId = row.id;
+    const binding = state.bindings[row.actionKey];
+    if (!binding) {
+      saveState();
+      render();
+      return;
+    }
+    binding.locked = !binding.locked;
+    focusBinding(row);
+  }
+
+  function clearBinding() {
+    const row = findRow(selectedRowId);
+    if (!row) return;
+    const binding = state.bindings[row.actionKey];
+    if (!binding) return;
+    if (binding.locked) {
+      showToast("这个绑定已锁定，先解除锁定再解绑。", { tone: "warn" });
+      return;
+    }
+    delete state.bindings[row.actionKey];
+    saveState();
+    render();
+  }
+
+  function updateNote(value, options = {}) {
+    const row = findRow(selectedRowId);
+    if (!row) return;
+    updateRowNote(row, value, options);
+  }
+
+  function updateRowNote(row, value, options = {}) {
+    const binding = state.bindings[row.actionKey];
+    if (!binding) return;
+    binding.note = value;
+    saveState();
+    if (options.syncSelection && row.id === selectedRowId) {
+      dom.noteInput.value = value;
+    }
+    if (options.renderRowsAfter) {
+      renderRows();
+    }
+  }
+
+  function openCodeDialog(hand, controlId) {
+    const control = getControl(hand, controlId);
+    codeEditTarget = { hand, controlId };
+    dom.codeDialogKicker.textContent = `${handLabels[hand]} CODE`;
+    dom.codeDialogTitle.textContent = control.label;
+    dom.codeDialogFields.replaceChildren();
+
+    if (control.kind === "axis") {
+      dom.codeDialogFields.append(field("axisCode", "Axis Code", control.axisCode || ""));
+      dom.recalcCodeBtn.disabled = true;
+    } else {
+      dom.codeDialogFields.append(field("baseButton", "Base 编号", valueOrEmpty(control.baseButton)));
+      if (control.shiftCapable) {
+        dom.codeDialogFields.append(field("shift1Button", "Shift1 编号", valueOrEmpty(control.shift1Button)));
+        dom.codeDialogFields.append(field("shift2Button", "Shift2 编号", valueOrEmpty(control.shift2Button)));
+        dom.recalcCodeBtn.disabled = false;
+      } else {
+        dom.recalcCodeBtn.disabled = true;
+      }
+    }
+    dom.codeDialog.showModal();
+  }
+
+  function field(name, labelText, value) {
+    const label = document.createElement("label");
+    label.textContent = labelText;
+    const input = document.createElement("input");
+    input.name = name;
+    input.value = value;
+    label.append(input);
+    return label;
+  }
+
+  function valueOrEmpty(value) {
+    return value === null || value === undefined ? "" : String(value);
+  }
+
+  function saveCodeDialog() {
+    if (!codeEditTarget) return;
+    const control = getControl(codeEditTarget.hand, codeEditTarget.controlId);
+    const fields = new FormDataLike(dom.codeDialogFields);
+    if (control.kind === "axis") {
+      control.axisCode = fields.axisCode || "";
+    } else {
+      control.baseButton = parseOptionalCode(fields.baseButton);
+      if (control.shiftCapable) {
+        control.shift1Button = parseOptionalCode(fields.shift1Button);
+        control.shift2Button = parseOptionalCode(fields.shift2Button);
+      }
+    }
+    dom.codeDialog.close();
+    saveState();
+    render();
+  }
+
+  function FormDataLike(container) {
+    const data = {};
+    for (const input of container.querySelectorAll("input")) {
+      data[input.name] = input.value.trim();
+    }
+    return data;
+  }
+
+  function parseOptionalCode(value) {
+    if (value === "") return null;
+    const parsed = Number.parseInt(value, 10);
+    return String(parsed) === value ? parsed : value;
+  }
+
+  function copyCodeToOtherSide() {
+    if (!codeEditTarget) return;
+    const other = codeEditTarget.hand === "left" ? "right" : "left";
+    const source = getControl(codeEditTarget.hand, codeEditTarget.controlId);
+    const target = getControl(other, codeEditTarget.controlId);
+    if (!source || !target) return;
+    for (const key of ["baseButton", "shift1Button", "shift2Button", "axisCode"]) {
+      if (key in source) target[key] = source[key];
+    }
+    saveState();
+    render();
+  }
+
+  function recalcShiftCodes() {
+    if (!codeEditTarget) return;
+    const control = getControl(codeEditTarget.hand, codeEditTarget.controlId);
+    if (!control || !control.shiftCapable || control.baseButton === null || control.baseButton === undefined) return;
+    if (typeof control.baseButton !== "number") return;
+    control.shift1Button = Number(control.baseButton) + state.deviceConfig.shift.shift1.offset;
+    control.shift2Button = Number(control.baseButton) + state.deviceConfig.shift.shift2.offset;
+    for (const input of dom.codeDialogFields.querySelectorAll("input")) {
+      if (input.name === "shift1Button") input.value = String(control.shift1Button);
+      if (input.name === "shift2Button") input.value = String(control.shift2Button);
+    }
+    saveState();
+    render();
+  }
+
+  function exportProfile() {
+    const data = {
+      schemaVersion: 1,
+      profileName: state.profileName,
+      updatedAt: new Date().toISOString(),
+      deviceConfig: state.deviceConfig,
+      bindings: state.bindings,
+      uiSettings: state.uiSettings,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "sc-dual-vkb-binding-profile.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importProfile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (data.schemaVersion !== 1 || !data.deviceConfig || !data.bindings) {
+          throw new Error("Invalid profile schema");
+        }
+        state = {
+          schemaVersion: 1,
+          profileName: data.profileName || seed.profileName,
+          deviceConfig: data.deviceConfig,
+          bindings: data.bindings,
+          uiSettings: { ...seed.uiSettings, ...(data.uiSettings || {}) },
+        };
+        selectedRowId = state.uiSettings.selectedRowId || null;
+        saveState();
+        render();
+      } catch (error) {
+        showToast(`导入失败：${error.message}`, { tone: "error", duration: 4200 });
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;",
+    })[char]);
+  }
+
+  function setActiveList(listType) {
+    state.uiSettings.activeList = listType;
+    saveState();
+    render();
+  }
+
+  function setStatusFilter(filter) {
+    state.uiSettings.statusFilter = filter;
+    saveState();
+    render();
+  }
+
+  function renderTabsAndFilters() {
+    for (const button of document.querySelectorAll(".tab-button")) {
+      button.classList.toggle("active", button.dataset.list === state.uiSettings.activeList);
+    }
+    for (const button of document.querySelectorAll(".filter-button")) {
+      button.classList.toggle("active", button.dataset.filter === (state.uiSettings.statusFilter || "all"));
+    }
+    dom.toggleCodesBtn.classList.toggle("active", Boolean(state.uiSettings.showCodes));
+    dom.toggleCodesBtn.setAttribute("aria-pressed", String(Boolean(state.uiSettings.showCodes)));
+    dom.toggleCodesBtn.title = state.uiSettings.showCodes ? "隐藏编号" : "显示编号";
+  }
+
+  function render() {
+    renderTabsAndFilters();
+    renderStickPanel("left");
+    renderStickPanel("right");
+    renderRows();
+    renderSelectionBar();
+  }
+
+  dom.search.addEventListener("input", (event) => {
+    searchText = event.target.value;
+    renderRows();
+  });
+  document.querySelectorAll(".tab-button").forEach((button) => {
+    button.addEventListener("click", () => setActiveList(button.dataset.list));
+  });
+  document.querySelectorAll(".filter-button").forEach((button) => {
+    button.addEventListener("click", () => setStatusFilter(button.dataset.filter));
+  });
+  dom.toggleCodesBtn.addEventListener("click", () => {
+    state.uiSettings.showCodes = !state.uiSettings.showCodes;
+    saveState();
+    render();
+  });
+  dom.lockBtn.addEventListener("click", toggleLock);
+  dom.clearBtn.addEventListener("click", clearBinding);
+  dom.noteInput.addEventListener("input", (event) => updateNote(event.target.value));
+  dom.noteInput.addEventListener("change", (event) => updateNote(event.target.value, { renderRowsAfter: true }));
+  dom.exportBtn.addEventListener("click", exportProfile);
+  dom.importInput.addEventListener("change", (event) => importProfile(event.target.files[0]));
+  dom.saveCodeBtn.addEventListener("click", saveCodeDialog);
+  dom.copyCodeBtn.addEventListener("click", copyCodeToOtherSide);
+  dom.recalcCodeBtn.addEventListener("click", recalcShiftCodes);
+
+  if (!selectedRowId && seed.scenarioRows.length) {
+    selectedRowId = seed.scenarioRows[0].id;
+  }
+  state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
+  render();
+})();
