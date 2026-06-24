@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SC Dual VKB Binding Planner</title>
-    <link rel="stylesheet" href="./styles.css?v=retro-60">
+    <link rel="stylesheet" href="./styles.css?v=retro-66">
   </head>
   <body>
     <div id="app" class="app-shell">
@@ -16,15 +16,19 @@
             <p>本地清单 · 摇杆点选 · 单 JSON 配置</p>
           </div>
         </div>
-        <div class="top-legend" aria-label="图例说明">
-          <span class="legend-item"><span class="legend-code">L/R</span>摇杆</span>
-          <span class="legend-item"><span class="legend-code">B/S1/S2</span>层</span>
-          <span class="legend-item"><span class="legend-dot green"></span>已绑</span>
-          <span class="legend-item"><span class="legend-dot amber"></span>当前</span>
-          <span class="legend-item"><span class="legend-dot red"></span>冲突</span>
-          <span class="legend-item"><span class="legend-lock"></span>锁定</span>
-        </div>
         <div class="top-actions">
+          <div class="profile-controls" aria-label="Profile 配置">
+            <span class="profile-kicker">PRF</span>
+            <select id="profileSelect" class="profile-select" aria-label="切换 Profile"></select>
+            <button id="profileAddBtn" class="panel-button icon-button" type="button" aria-label="新增 Profile" title="新增 Profile">
+              <span aria-hidden="true">+</span>
+              <span class="sr-only">新增 Profile</span>
+            </button>
+            <button id="profileDeleteBtn" class="panel-button icon-button" type="button" aria-label="删除当前 Profile" title="删除当前 Profile">
+              <span aria-hidden="true">×</span>
+              <span class="sr-only">删除当前 Profile</span>
+            </button>
+          </div>
           <label class="search-box">
             <span>SCAN</span>
             <input id="searchInput" type="search" placeholder="搜索动作、说明、键位">
@@ -53,6 +57,14 @@
             <div class="tabs" role="tablist" aria-label="清单类型">
               <button id="scenarioTab" class="tab-button active" type="button" data-list="scenario">场景清单</button>
               <button id="gameTab" class="tab-button" type="button" data-list="game">游戏顺序</button>
+            </div>
+            <div class="top-legend" aria-label="图例说明">
+              <span class="legend-item"><span class="legend-code">L/R</span>摇杆</span>
+              <span class="legend-item"><span class="legend-code">B/S1/S2</span>层</span>
+              <span class="legend-item"><span class="legend-dot green"></span>已绑</span>
+              <span class="legend-item"><span class="legend-dot amber"></span>当前</span>
+              <span class="legend-item"><span class="legend-dot red"></span>冲突</span>
+              <span class="legend-item"><span class="legend-lock"></span>锁定</span>
             </div>
             <div class="filters" aria-label="状态筛选">
               <button class="filter-button active" type="button" data-filter="all">全部</button>
@@ -100,7 +112,30 @@
       </form>
     </dialog>
 
+    <dialog id="profileDialog" class="profile-dialog">
+      <form method="dialog" class="profile-card">
+        <header>
+          <span>PROFILE</span>
+          <h2>新增 Profile</h2>
+        </header>
+        <div class="profile-fields">
+          <label>
+            名称
+            <input id="profileNewName" type="text" maxlength="32" autocomplete="off">
+          </label>
+          <label>
+            复制自
+            <select id="profileSourceSelect"></select>
+          </label>
+        </div>
+        <menu>
+          <button value="cancel">关闭</button>
+          <button id="profileCreateBtn" value="default" type="button">创建</button>
+        </menu>
+      </form>
+    </dialog>
+
     <script src="./data.js?v=retro-4"></script>
-    <script src="./app.js?v=retro-17"></script>
+    <script src="./app.js?v=retro-28"></script>
   </body>
 </html>

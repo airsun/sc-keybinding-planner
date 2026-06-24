@@ -1,15 +1,26 @@
 (function () {
   const seed = window.VKB_PLANNER_SEED;
   const storageKey = "sc-dual-vkb-binding-planner:v1";
+  const workspaceSchemaVersion = 2;
   const layers = ["base", "shift1", "shift2"];
   const layerLabels = { base: "Base", shift1: "S1", shift2: "S2" };
   const handLabels = { left: "左杆", right: "右杆" };
+  const maxProfileNameLength = 32;
+  const defaultProfileTemplates = [
+    { id: "flight", name: "Flight" },
+    { id: "ground", name: "Ground" },
+    { id: "combat", name: "Combat" },
+    { id: "mining", name: "Mining" },
+  ];
 
   const dom = {
     leftPanel: document.getElementById("leftPanel"),
     rightPanel: document.getElementById("rightPanel"),
     rows: document.getElementById("bindingRows"),
     search: document.getElementById("searchInput"),
+    profileSelect: document.getElementById("profileSelect"),
+    profileAddBtn: document.getElementById("profileAddBtn"),
+    profileDeleteBtn: document.getElementById("profileDeleteBtn"),
     selectedTitle: document.getElementById("selectedTitle"),
     lockBtn: document.getElementById("lockBtn"),
     clearBtn: document.getElementById("clearBtn"),
@@ -24,6 +35,10 @@
     saveCodeBtn: document.getElementById("saveCodeBtn"),
     copyCodeBtn: document.getElementById("copyCodeBtn"),
     recalcCodeBtn: document.getElementById("recalcCodeBtn"),
+    profileDialog: document.getElementById("profileDialog"),
+    profileNewName: document.getElementById("profileNewName"),
+    profileSourceSelect: document.getElementById("profileSourceSelect"),
+    profileCreateBtn: document.getElementById("profileCreateBtn"),
   };
 
   let state = loadState();
@@ -35,40 +50,291 @@
     return JSON.parse(JSON.stringify(value));
   }
 
+  function seedBindings() {
+    const bindings = {};
+    for (const binding of seed.defaultBindings) {
+      bindings[binding.actionKey] = clone(binding);
+    }
+    return bindings;
+  }
+
+  function slugifyProfileId(value, fallback = "profile") {
+    const slug = String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return slug || fallback;
+  }
+
+  function uniqueProfileId(baseId, profiles) {
+    const base = slugifyProfileId(baseId);
+    if (!profiles[base]) return base;
+    let index = 2;
+    while (profiles[`${base}-${index}`]) index += 1;
+    return `${base}-${index}`;
+  }
+
+  function normalizeProfileName(value, fallback = "Profile") {
+    const name = String(value || "")
+      .trim()
+      .replace(/\s+/g, " ");
+    const normalized = name || fallback;
+    return normalized.slice(0, maxProfileNameLength);
+  }
+
+  function makeProfile(id, name, bindings = seedBindings(), timestamps = {}) {
+    const now = new Date().toISOString();
+    return {
+      id,
+      name: normalizeProfileName(name, id),
+      createdAt: timestamps.createdAt || now,
+      updatedAt: timestamps.updatedAt || now,
+      bindings: clone(bindings || {}),
+    };
+  }
+
+  function defaultProfiles() {
+    const profiles = {};
+    const baseBindings = seedBindings();
+    for (const profile of defaultProfileTemplates) {
+      profiles[profile.id] = makeProfile(profile.id, profile.name, baseBindings);
+    }
+    return profiles;
+  }
+
+  function defaultWorkspace() {
+    const profiles = defaultProfiles();
+    return normalizeWorkspace({
+      schemaVersion: workspaceSchemaVersion,
+      activeProfileId: "flight",
+      deviceConfig: clone(seed.deviceConfig),
+      profiles,
+      uiSettings: clone(seed.uiSettings),
+    });
+  }
+
+  function migrateV1Workspace(data) {
+    const name = data.profileName || seed.profileName || "Flight";
+    const profiles = {};
+    const id = uniqueProfileId(slugifyProfileId(name, "flight"), profiles);
+    profiles[id] = makeProfile(id, name, data.bindings || seedBindings());
+    return normalizeWorkspace({
+      schemaVersion: workspaceSchemaVersion,
+      activeProfileId: id,
+      deviceConfig: data.deviceConfig || clone(seed.deviceConfig),
+      profiles,
+      uiSettings: { ...seed.uiSettings, ...(data.uiSettings || {}) },
+    });
+  }
+
+  function normalizeProfile(profile, fallbackId) {
+    const id = slugifyProfileId(profile?.id || fallbackId);
+    return makeProfile(
+      id,
+      profile?.name || id,
+      profile?.bindings || {},
+      { createdAt: profile?.createdAt, updatedAt: profile?.updatedAt },
+    );
+  }
+
+  function normalizeWorkspace(data) {
+    const sourceProfiles = data?.profiles && typeof data.profiles === "object" ? data.profiles : {};
+    const profiles = {};
+    for (const [key, profile] of Object.entries(sourceProfiles)) {
+      const normalized = normalizeProfile(profile, key);
+      const id = uniqueProfileId(normalized.id, profiles);
+      profiles[id] = { ...normalized, id };
+    }
+    if (!Object.keys(profiles).length) {
+      Object.assign(profiles, defaultProfiles());
+    }
+    const activeProfileId = profiles[data?.activeProfileId] ? data.activeProfileId : Object.keys(profiles)[0];
+    return {
+      schemaVersion: workspaceSchemaVersion,
+      activeProfileId,
+      deviceConfig: data?.deviceConfig || clone(seed.deviceConfig),
+      profiles,
+      uiSettings: { ...seed.uiSettings, ...(data?.uiSettings || {}) },
+    };
+  }
+
+  function parseWorkspacePayload(data) {
+    if (!data || typeof data !== "object") throw new Error("Invalid profile schema");
+    if (data.schemaVersion === workspaceSchemaVersion && validateWorkspaceShape(data)) {
+      return normalizeWorkspace(data);
+    }
+    if (data.schemaVersion === 1 && validateV1Payload(data)) {
+      return migrateV1Workspace(data);
+    }
+    throw new Error("Invalid profile schema");
+  }
+
+  function validateWorkspaceShape(data) {
+    const profiles = data?.profiles;
+    const hands = data?.deviceConfig?.hands;
+    if (!profiles || typeof profiles !== "object") return false;
+    if (!hands?.left?.controls || !hands?.right?.controls) return false;
+    return Object.values(profiles).some((profile) => (
+      profile &&
+      typeof profile === "object" &&
+      typeof profile.name === "string" &&
+      profile.bindings &&
+      typeof profile.bindings === "object"
+    ));
+  }
+
+  function validateV1Payload(data) {
+    const hands = data?.deviceConfig?.hands;
+    return Boolean(
+      data?.bindings &&
+      typeof data.bindings === "object" &&
+      hands?.left?.controls &&
+      hands?.right?.controls,
+    );
+  }
+
   function loadState() {
     const saved = localStorage.getItem(storageKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.schemaVersion === 1) {
-          return {
-            schemaVersion: 1,
-            profileName: parsed.profileName || seed.profileName,
-            deviceConfig: parsed.deviceConfig || clone(seed.deviceConfig),
-            bindings: parsed.bindings || {},
-            uiSettings: { ...seed.uiSettings, ...(parsed.uiSettings || {}) },
-          };
-        }
+        return parseWorkspacePayload(parsed);
       } catch (error) {
         console.warn("Ignoring invalid saved state", error);
       }
     }
-    const bindings = {};
-    for (const binding of seed.defaultBindings) {
-      bindings[binding.actionKey] = clone(binding);
-    }
-    return {
-      schemaVersion: 1,
-      profileName: seed.profileName,
-      deviceConfig: clone(seed.deviceConfig),
-      bindings,
-      uiSettings: clone(seed.uiSettings),
-    };
+    return defaultWorkspace();
   }
 
   function saveState() {
     state.uiSettings.selectedRowId = selectedRowId;
+    const profile = activeProfile();
+    if (profile) profile.updatedAt = new Date().toISOString();
     localStorage.setItem(storageKey, JSON.stringify(state));
+  }
+
+  function profileList() {
+    return Object.values(state.profiles || {});
+  }
+
+  function activeProfile() {
+    if (!state.profiles || !Object.keys(state.profiles).length) {
+      state.profiles = defaultProfiles();
+    }
+    if (!state.profiles[state.activeProfileId]) {
+      state.activeProfileId = Object.keys(state.profiles)[0];
+    }
+    return state.profiles[state.activeProfileId];
+  }
+
+  function activeBindings() {
+    const profile = activeProfile();
+    profile.bindings = profile.bindings || {};
+    return profile.bindings;
+  }
+
+  function renderProfileControls() {
+    const profiles = profileList();
+    const profile = activeProfile();
+    dom.profileSelect.replaceChildren();
+    for (const item of profiles) {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent = item.name;
+      dom.profileSelect.append(option);
+    }
+    dom.profileSelect.value = profile.id;
+    dom.profileSelect.title = `当前 Profile：${profile.name}`;
+    dom.profileDeleteBtn.disabled = false;
+    dom.profileDeleteBtn.classList.toggle("is-protected", profiles.length <= 1);
+    dom.profileDeleteBtn.title = profiles.length <= 1 ? "至少保留一个 Profile" : "删除当前 Profile";
+  }
+
+  function setActiveProfile(profileId) {
+    if (!state.profiles?.[profileId] || profileId === state.activeProfileId) return;
+    state.activeProfileId = profileId;
+    saveState();
+    render();
+  }
+
+  function openProfileDialog() {
+    dom.profileSourceSelect.replaceChildren();
+    for (const profile of profileList()) {
+      const option = document.createElement("option");
+      option.value = profile.id;
+      option.textContent = profile.name;
+      dom.profileSourceSelect.append(option);
+    }
+    dom.profileSourceSelect.value = activeProfile().id;
+    dom.profileNewName.value = uniqueProfileName("New Profile");
+    dom.profileNewName.maxLength = maxProfileNameLength;
+    dom.profileDialog.showModal();
+    window.requestAnimationFrame(() => {
+      dom.profileNewName.focus();
+      dom.profileNewName.select();
+    });
+  }
+
+  function createProfileFromDialog() {
+    const rawName = dom.profileNewName.value;
+    if (!rawName.trim()) {
+      showToast("Profile 名称不能为空。", { tone: "warn" });
+      return;
+    }
+    const source = state.profiles[dom.profileSourceSelect.value] || activeProfile();
+    const name = uniqueProfileName(rawName);
+    const id = uniqueProfileId(slugifyProfileId(name, "profile"), state.profiles);
+    state.profiles[id] = makeProfile(id, name, source.bindings);
+    state.activeProfileId = id;
+    dom.profileDialog.close();
+    saveState();
+    render();
+    showToast(`已创建 Profile：${name}`, { tone: "info" });
+  }
+
+  function uniqueProfileName(baseName) {
+    const names = new Set(profileList().map((profile) => profile.name));
+    const base = normalizeProfileName(baseName, "Profile");
+    if (!names.has(base)) return base;
+    let index = 2;
+    while (true) {
+      const suffix = ` ${index}`;
+      const candidate = `${base.slice(0, maxProfileNameLength - suffix.length)}${suffix}`;
+      if (!names.has(candidate)) return candidate;
+      index += 1;
+    }
+  }
+
+  function requestDeleteActiveProfile() {
+    const profiles = profileList();
+    if (profiles.length <= 1) {
+      showToast("至少保留一个 Profile。", { tone: "warn" });
+      return;
+    }
+    const current = activeProfile();
+    showToast(`删除 Profile：${current.name}？`, {
+      tone: "warn",
+      actionLabel: "删除",
+      cancelLabel: "取消",
+      duration: 7600,
+      onAction: () => deleteActiveProfile(current.id, current.name),
+    });
+  }
+
+  function deleteActiveProfile(profileId, profileName) {
+    const ids = Object.keys(state.profiles || {});
+    if (ids.length <= 1 || !state.profiles?.[profileId]) {
+      showToast("至少保留一个 Profile。", { tone: "warn" });
+      return;
+    }
+    const currentIndex = ids.indexOf(profileId);
+    const fallbackId = ids[currentIndex + 1] || ids[currentIndex - 1] || ids.find((id) => id !== profileId);
+    delete state.profiles[profileId];
+    state.activeProfileId = fallbackId;
+    saveState();
+    render();
+    showToast(`已删除 Profile：${profileName}`, { tone: "info" });
   }
 
   function allRows() {
@@ -91,9 +357,29 @@
     return state.uiSettings.layers?.[hand] || "base";
   }
 
+  function getTargetHand() {
+    const hand = state.uiSettings.targetHand;
+    return hand === "left" || hand === "right" ? hand : null;
+  }
+
+  function getPendingLayer() {
+    const layer = state.uiSettings.pendingLayer;
+    return layers.includes(layer) ? layer : null;
+  }
+
+  function clearPendingTarget() {
+    delete state.uiSettings.targetHand;
+    delete state.uiSettings.pendingLayer;
+  }
+
   function setLayerForHand(hand, layer) {
     state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
     state.uiSettings.layers[hand] = layer;
+    const selectedRow = selectedRowId ? findRow(selectedRowId) : null;
+    if (selectedRow && !bindingForRow(selectedRow)) {
+      state.uiSettings.targetHand = hand;
+      delete state.uiSettings.pendingLayer;
+    }
     saveState();
     render();
   }
@@ -169,12 +455,12 @@
   }
 
   function bindingForRow(row) {
-    return state.bindings[row.actionKey] || null;
+    return activeBindings()[row.actionKey] || null;
   }
 
   function occupancy() {
     const map = new Map();
-    for (const binding of Object.values(state.bindings)) {
+    for (const binding of Object.values(activeBindings())) {
       if (!binding.enabled || !binding.slot) continue;
       const key = slotKey(binding.slot);
       if (!map.has(key)) map.set(key, []);
@@ -229,42 +515,74 @@
     const host = toastHost();
     const toast = makeEl("div", `toast ${options.tone || "info"}`.trim());
     toast.setAttribute("role", "status");
-    toast.append(makeEl("div", "toast-message", message));
+    if (options.countdownMs) toast.classList.add("countdown");
+    const messageEl = makeEl("div", "toast-message", message);
+    let countdownTimer = null;
+    if (options.countdownMs) {
+      messageEl.append(makeEl("span", "toast-countdown", countdownText(options.countdownMs)));
+    }
+    toast.append(messageEl);
 
     let dismissTimer = null;
     const dismiss = () => {
       clearTimeout(dismissTimer);
+      clearInterval(countdownTimer);
       toast.classList.remove("show");
       toast.classList.add("hide");
       window.setTimeout(() => toast.remove(), 180);
     };
 
-    if (options.actionLabel && typeof options.onAction === "function") {
+    if (options.actionLabel || options.secondaryActionLabel || options.cancelLabel) {
       const actions = makeEl("div", "toast-actions");
-      const action = makeEl("button", "toast-action primary", options.actionLabel);
-      action.type = "button";
-      action.addEventListener("click", (event) => {
-        event.stopPropagation();
-        dismiss();
-        options.onAction();
-      });
-      actions.append(action);
+
+      if (options.actionLabel && typeof options.onAction === "function") {
+        const action = makeToastAction(options.actionLabel, "primary", () => options.onAction());
+        actions.append(action);
+      }
+      if (options.secondaryActionLabel && typeof options.onSecondaryAction === "function") {
+        const secondary = makeToastAction(options.secondaryActionLabel, "", () => options.onSecondaryAction());
+        actions.append(secondary);
+      }
       if (options.cancelLabel) {
-        const cancel = makeEl("button", "toast-action", options.cancelLabel);
-        cancel.type = "button";
-        cancel.addEventListener("click", (event) => {
-          event.stopPropagation();
-          dismiss();
+        const cancel = makeToastAction(options.cancelLabel, "", () => {
+          if (typeof options.onCancel === "function") options.onCancel();
         });
         actions.append(cancel);
       }
       toast.append(actions);
+
+      function makeToastAction(label, tone, handler) {
+        const button = makeEl("button", `toast-action ${tone || ""}`.trim(), label);
+        button.type = "button";
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          dismiss();
+          handler();
+        });
+        return button;
+      }
+    }
+
+    if (options.countdownMs) {
+      const progress = makeEl("div", "toast-progress");
+      progress.style.setProperty("--toast-duration", `${options.countdownMs}ms`);
+      toast.append(progress);
+      const startedAt = Date.now();
+      countdownTimer = window.setInterval(() => {
+        const remaining = Math.max(0, options.countdownMs - (Date.now() - startedAt));
+        const countdown = toast.querySelector(".toast-countdown");
+        if (countdown) countdown.textContent = countdownText(remaining);
+      }, 250);
     }
 
     host.append(toast);
     window.requestAnimationFrame(() => toast.classList.add("show"));
-    dismissTimer = window.setTimeout(dismiss, options.duration || (options.actionLabel ? 7000 : 2600));
+    dismissTimer = window.setTimeout(dismiss, options.countdownMs || options.duration || (options.actionLabel ? 7000 : 2600));
     return dismiss;
+  }
+
+  function countdownText(ms) {
+    return String(Math.ceil(ms / 1000)).padStart(2, "0");
   }
 
   function renderStickPanel(hand) {
@@ -559,6 +877,7 @@
     controls.append(renderHandSegment(row, binding));
     controls.append(renderLayerSegment(row, binding));
     controls.append(renderSlotButton(row, binding, status));
+    controls.append(renderCardClearButton(row, binding));
     controls.append(renderCardLockButton(row, binding));
     consoleEl.append(controls);
     return consoleEl;
@@ -608,8 +927,9 @@
       showToast("其它冲突绑定已锁定，先解除锁定再解绑。", { tone: "warn" });
       return;
     }
+    const bindings = activeBindings();
     for (const item of removable) {
-      delete state.bindings[item.actionKey];
+      delete bindings[item.actionKey];
     }
     const row = allRows().find((item) => item.actionKey === binding.actionKey);
     if (row) selectedRowId = row.id;
@@ -620,8 +940,10 @@
 
   function renderHandSegment(row, binding) {
     const segment = makeEl("div", "seg hand-seg");
+    const targetHand = getTargetHand();
     for (const hand of ["left", "right"]) {
-      const button = makeEl("button", binding?.slot?.hand === hand ? "active" : "", hand === "left" ? "L" : "R");
+      const active = binding?.slot?.hand === hand || (!binding?.slot && row.id === selectedRowId && targetHand === hand);
+      const button = makeEl("button", active ? "active" : "", hand === "left" ? "L" : "R");
       button.type = "button";
       button.title = handLabels[hand];
       button.addEventListener("click", (event) => {
@@ -636,12 +958,17 @@
   function renderLayerSegment(row, binding) {
     const segment = makeEl("div", "seg layer-seg");
     const control = binding?.slot ? getControl(binding.slot.hand, binding.slot.control) : null;
+    const targetHand = binding?.slot?.hand || getTargetHand();
+    const targetLayer = targetHand ? getLayerForHand(targetHand) : null;
+    const pendingLayer = getPendingLayer();
     for (const layer of layers) {
       const isAxis = binding?.slot?.slotType === "axis";
       const disabled = isAxis || (control && !control.shiftCapable && layer !== "base");
       const active = binding?.slot?.slotType === "axis"
         ? layer === "base"
-        : (binding?.slot?.layer || "base") === layer;
+        : binding?.slot
+          ? (binding.slot.layer || "base") === layer
+          : row.id === selectedRowId && (targetHand ? targetLayer === layer : pendingLayer === layer);
       const button = makeEl("button", active ? "active" : "", layerLabels[layer]);
       button.type = "button";
       button.disabled = disabled;
@@ -671,8 +998,21 @@
     });
 
     const light = makeEl("span", `status-dot-ui ${status.tone || "muted"}`.trim());
+    const targetHand = getTargetHand();
+    const targetLayer = targetHand ? getLayerForHand(targetHand) : null;
+    const pendingLayer = getPendingLayer();
     const label = makeEl("span", "slot-pill-label", binding?.slot ? slotLabel(binding.slot) : "点选键位");
-    const code = makeEl("span", "slot-pill-code", binding?.slot && state.uiSettings.showCodes ? compactCodeForSlot(binding.slot) : status.label);
+    let unboundTarget = status.label;
+    if (row.id === selectedRowId) {
+      if (targetHand) {
+        unboundTarget = `${targetHand === "left" ? "L" : "R"} · ${layerLabels[targetLayer]}`;
+      } else if (pendingLayer) {
+        unboundTarget = `${layerLabels[pendingLayer]} · 待L/R`;
+      } else {
+        unboundTarget = "待点选";
+      }
+    }
+    const code = makeEl("span", "slot-pill-code", binding?.slot && state.uiSettings.showCodes ? compactCodeForSlot(binding.slot) : unboundTarget);
     button.append(light, label, code);
     return button;
   }
@@ -726,8 +1066,22 @@
     return button;
   }
 
+  function renderCardClearButton(row, binding) {
+    const button = makeEl("button", "card-clear");
+    button.type = "button";
+    button.disabled = !binding;
+    button.title = binding?.locked ? "先解除锁定再解绑" : "解绑当前绑定";
+    button.setAttribute("aria-label", button.title);
+    button.append(makeEl("span", "clear-icon", "CLR"), makeEl("span", "sr-only", "解绑"));
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      clearRowBinding(row);
+    });
+    return button;
+  }
+
   function setLockButtonVisual(button, locked, title) {
-    const icon = makeEl("span", locked ? "lock-icon locked" : "lock-icon");
+    const icon = makeEl("span", locked ? "lock-icon locked" : "lock-icon", locked ? "LCK" : "REL");
     icon.setAttribute("aria-hidden", "true");
     const text = makeEl("span", "sr-only", locked ? "解除锁定" : "锁定");
     button.replaceChildren(icon, text);
@@ -759,7 +1113,12 @@
     const binding = bindingForRow(row);
     if (binding?.slot?.slotType === "button") {
       state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
+      state.uiSettings.targetHand = binding.slot.hand;
       state.uiSettings.layers[binding.slot.hand] = binding.slot.layer || "base";
+    } else if (binding?.slot?.hand) {
+      state.uiSettings.targetHand = binding.slot.hand;
+    } else {
+      clearPendingTarget();
     }
     saveState();
     render();
@@ -770,6 +1129,12 @@
     const binding = bindingForRow(row);
     if (!binding?.slot) {
       state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
+      state.uiSettings.targetHand = hand;
+      const pendingLayer = getPendingLayer();
+      if (pendingLayer) {
+        state.uiSettings.layers[hand] = pendingLayer;
+        delete state.uiSettings.pendingLayer;
+      }
       state.uiSettings.layers[hand] = state.uiSettings.layers[hand] || "base";
       saveState();
       render();
@@ -779,10 +1144,6 @@
       focusBinding(row);
       return;
     }
-    if (binding.locked) {
-      showToast("这个绑定已锁定，先解除锁定再修改。", { tone: "warn" });
-      return;
-    }
     const control = getControl(hand, binding.slot.control);
     if (!control || control.bindable === false) {
       showToast("另一侧没有对应的可绑定控件。", { tone: "warn" });
@@ -790,14 +1151,21 @@
     }
     const slot = { ...binding.slot, hand };
     if (slot.slotType === "button" && !control.shiftCapable) slot.layer = "base";
-    setBindingSlot(row, slot);
+    setBindingSlot(row, slot, { allowConflict: true });
   }
 
   function setBindingLayer(row, layer) {
     selectedRowId = row.id;
     const binding = bindingForRow(row);
     if (!binding?.slot) {
-      state.uiSettings.layers = { ...(state.uiSettings.layers || { left: "base", right: "base" }), left: layer, right: layer };
+      const targetHand = getTargetHand();
+      state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
+      if (targetHand) {
+        state.uiSettings.layers[targetHand] = layer;
+        delete state.uiSettings.pendingLayer;
+      } else {
+        state.uiSettings.pendingLayer = layer;
+      }
       saveState();
       render();
       return;
@@ -810,19 +1178,32 @@
       focusBinding(row);
       return;
     }
-    if (binding.locked) {
-      showToast("这个绑定已锁定，先解除锁定再修改。", { tone: "warn" });
-      return;
-    }
     const control = getControl(binding.slot.hand, binding.slot.control);
     if (!control?.shiftCapable && layer !== "base") return;
-    setBindingSlot(row, { ...binding.slot, layer });
+    setBindingSlot(row, { ...binding.slot, layer }, { allowConflict: true });
   }
 
   function setBindingSlot(row, slot, options = {}) {
-    const existing = state.bindings[row.actionKey];
+    const bindings = activeBindings();
+    const existing = bindings[row.actionKey];
+    const undoSnapshot = options.allowConflict
+      ? {
+        profileId: state.activeProfileId,
+        rowId: row.id,
+        actionKey: row.actionKey,
+        previousBinding: existing ? clone(existing) : null,
+        previousLayers: clone(state.uiSettings.layers || { left: "base", right: "base" }),
+        nextSlot: clone(slot),
+      }
+      : null;
     if (existing?.locked && !sameSlot(existing.slot, slot)) {
-      showToast("这个绑定已锁定，先解除锁定再修改。", { tone: "warn" });
+      showToast("这个绑定已锁定，先解除锁定再修改。", {
+        tone: "warn",
+        actionLabel: "解锁并修改",
+        cancelLabel: "取消",
+        duration: 7600,
+        onAction: () => unlockAndSetBindingSlot(row, slot, options),
+      });
       return false;
     }
     if (existing?.slot && sameSlot(existing.slot, slot)) {
@@ -836,7 +1217,7 @@
       showToast("这个键位已经锁定，先解除锁定再修改。", { tone: "warn" });
       return false;
     }
-    if (occupants.length && !options.replaceConflicts) {
+    if (occupants.length && !options.replaceConflicts && !options.allowConflict) {
       const names = occupants.map((item) => displayNameForAction(item.actionKey)).join("、");
       showToast(`该键位已被 ${names} 占用。`, {
         tone: "warn",
@@ -847,13 +1228,13 @@
       });
       return false;
     }
-    if (occupants.length) {
+    if (occupants.length && options.replaceConflicts) {
       for (const item of occupants) {
-        delete state.bindings[item.actionKey];
+        delete bindings[item.actionKey];
       }
     }
 
-    state.bindings[row.actionKey] = {
+    bindings[row.actionKey] = {
       actionKey: row.actionKey,
       slot,
       enabled: true,
@@ -863,11 +1244,70 @@
     selectedRowId = row.id;
     if (slot.slotType === "button") {
       state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
+      state.uiSettings.targetHand = slot.hand;
       state.uiSettings.layers[slot.hand] = slot.layer || "base";
+      delete state.uiSettings.pendingLayer;
     }
     saveState();
     render();
+    if (occupants.length && options.allowConflict) {
+      showConflictToast(row, slot, undoSnapshot);
+    }
     return true;
+  }
+
+  function unlockAndSetBindingSlot(row, slot, options = {}) {
+    const binding = activeBindings()[row.actionKey];
+    if (!binding) return;
+    binding.locked = false;
+    setBindingSlot(row, slot, { ...options, allowConflict: true });
+  }
+
+  function showConflictToast(row, slot, undoSnapshot) {
+    const layer = slot.slotType === "axis" ? "Axis" : layerLabels[slot.layer || "base"];
+    showToast(`CONFLICT · ${handLabels[slot.hand]} ${slotLabel(slot)} ${layer}`, {
+      tone: "warn",
+      countdownMs: 8000,
+      actionLabel: "撤销",
+      secondaryActionLabel: "查看",
+      onAction: () => undoBindingChange(undoSnapshot),
+      onSecondaryAction: () => revealBinding(row.id),
+    });
+  }
+
+  function undoBindingChange(snapshot) {
+    const profile = state.profiles?.[snapshot.profileId];
+    if (!profile) {
+      showToast("Profile 已变化，无法撤销这次设定。", { tone: "warn" });
+      return;
+    }
+    profile.bindings = profile.bindings || {};
+    const current = profile.bindings[snapshot.actionKey];
+    if (!current?.slot || !sameSlot(current.slot, snapshot.nextSlot)) {
+      showToast("该绑定已经再次变化，撤销已跳过。", { tone: "warn" });
+      return;
+    }
+    if (snapshot.previousBinding) {
+      profile.bindings[snapshot.actionKey] = clone(snapshot.previousBinding);
+    } else {
+      delete profile.bindings[snapshot.actionKey];
+    }
+    state.activeProfileId = snapshot.profileId;
+    state.uiSettings.layers = clone(snapshot.previousLayers);
+    selectedRowId = snapshot.rowId;
+    saveState();
+    render();
+    showToast("已撤销刚才设定。", { tone: "info" });
+  }
+
+  function revealBinding(rowId) {
+    selectedRowId = rowId;
+    saveState();
+    render();
+    window.setTimeout(() => {
+      const card = dom.rows.querySelector(`[data-row-id="${rowId}"]`);
+      card?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 0);
   }
 
   function renderSelectionBar() {
@@ -898,9 +1338,16 @@
       showToast("先选择一行动作。", { tone: "warn" });
       return;
     }
+    const pendingLayer = getPendingLayer();
+    if (pendingLayer && !bindingForRow(row)) {
+      state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
+      state.uiSettings.layers[hand] = pendingLayer;
+      state.uiSettings.targetHand = hand;
+      delete state.uiSettings.pendingLayer;
+    }
     const slot = normalizeSlot(hand, controlId);
     if (!slot) return;
-    setBindingSlot(row, slot);
+    setBindingSlot(row, slot, { allowConflict: true });
   }
 
   function displayNameForAction(actionKey) {
@@ -911,7 +1358,7 @@
   function toggleLock() {
     const row = findRow(selectedRowId);
     if (!row) return;
-    const binding = state.bindings[row.actionKey];
+    const binding = activeBindings()[row.actionKey];
     if (!binding) return;
     binding.locked = !binding.locked;
     saveState();
@@ -920,7 +1367,7 @@
 
   function toggleRowLock(row) {
     selectedRowId = row.id;
-    const binding = state.bindings[row.actionKey];
+    const binding = activeBindings()[row.actionKey];
     if (!binding) {
       saveState();
       render();
@@ -933,15 +1380,29 @@
   function clearBinding() {
     const row = findRow(selectedRowId);
     if (!row) return;
-    const binding = state.bindings[row.actionKey];
-    if (!binding) return;
-    if (binding.locked) {
-      showToast("这个绑定已锁定，先解除锁定再解绑。", { tone: "warn" });
-      return;
+    clearRowBinding(row);
+  }
+
+  function clearRowBinding(row) {
+    selectedRowId = row.id;
+    const bindings = activeBindings();
+    const binding = bindings[row.actionKey];
+    if (!binding) {
+      saveState();
+      render();
+      return false;
     }
-    delete state.bindings[row.actionKey];
+    if (binding.locked) {
+      saveState();
+      render();
+      showToast("这个绑定已锁定，先解除锁定再解绑。", { tone: "warn" });
+      return false;
+    }
+    delete bindings[row.actionKey];
+    clearPendingTarget();
     saveState();
     render();
+    return true;
   }
 
   function updateNote(value, options = {}) {
@@ -951,7 +1412,7 @@
   }
 
   function updateRowNote(row, value, options = {}) {
-    const binding = state.bindings[row.actionKey];
+    const binding = activeBindings()[row.actionKey];
     if (!binding) return;
     binding.note = value;
     saveState();
@@ -1016,6 +1477,7 @@
     dom.codeDialog.close();
     saveState();
     render();
+    showToast("键位编号已更新；这是全局硬件设置，所有 Profile 共用。", { tone: "info" });
   }
 
   function FormDataLike(container) {
@@ -1043,39 +1505,42 @@
     }
     saveState();
     render();
+    showToast("已复制到另一侧；键位编号为所有 Profile 共用。", { tone: "info" });
   }
 
   function recalcShiftCodes() {
     if (!codeEditTarget) return;
     const control = getControl(codeEditTarget.hand, codeEditTarget.controlId);
-    if (!control || !control.shiftCapable || control.baseButton === null || control.baseButton === undefined) return;
-    if (typeof control.baseButton !== "number") return;
-    control.shift1Button = Number(control.baseButton) + state.deviceConfig.shift.shift1.offset;
-    control.shift2Button = Number(control.baseButton) + state.deviceConfig.shift.shift2.offset;
+    if (!control || !control.shiftCapable) return;
+    const fields = new FormDataLike(dom.codeDialogFields);
+    const baseButton = parseOptionalCode(fields.baseButton);
+    if (typeof baseButton !== "number") return;
+    control.baseButton = baseButton;
+    control.shift1Button = baseButton + state.deviceConfig.shift.shift1.offset;
+    control.shift2Button = baseButton + state.deviceConfig.shift.shift2.offset;
     for (const input of dom.codeDialogFields.querySelectorAll("input")) {
       if (input.name === "shift1Button") input.value = String(control.shift1Button);
       if (input.name === "shift2Button") input.value = String(control.shift2Button);
     }
     saveState();
     render();
+    showToast("Shift 编号已按全局 offset 重算。", { tone: "info" });
   }
 
   function exportProfile() {
     const data = {
-      schemaVersion: 1,
-      profileName: state.profileName,
+      ...state,
+      schemaVersion: workspaceSchemaVersion,
       updatedAt: new Date().toISOString(),
-      deviceConfig: state.deviceConfig,
-      bindings: state.bindings,
-      uiSettings: state.uiSettings,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "sc-dual-vkb-binding-profile.json";
+    link.download = "sc-dual-vkb-binding-workspace.json";
     link.click();
     URL.revokeObjectURL(url);
+    showToast("Workspace JSON 已导出。", { tone: "info" });
   }
 
   function importProfile(file) {
@@ -1084,22 +1549,29 @@
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result);
-        if (data.schemaVersion !== 1 || !data.deviceConfig || !data.bindings) {
-          throw new Error("Invalid profile schema");
-        }
-        state = {
-          schemaVersion: 1,
-          profileName: data.profileName || seed.profileName,
-          deviceConfig: data.deviceConfig,
-          bindings: data.bindings,
-          uiSettings: { ...seed.uiSettings, ...(data.uiSettings || {}) },
-        };
-        selectedRowId = state.uiSettings.selectedRowId || null;
-        saveState();
-        render();
+        const nextState = parseWorkspacePayload(data);
+        showToast("导入会覆盖当前所有 Profile 和全局键位编号。", {
+          tone: "warn",
+          actionLabel: "覆盖",
+          cancelLabel: "取消",
+          duration: 8200,
+          onAction: () => {
+            state = nextState;
+            selectedRowId = findRow(state.uiSettings.selectedRowId)?.id || seed.scenarioRows[0]?.id || seed.gameRows[0]?.id || null;
+            saveState();
+            render();
+            showToast("Workspace 已导入。", { tone: "info" });
+          },
+        });
       } catch (error) {
         showToast(`导入失败：${error.message}`, { tone: "error", duration: 4200 });
+      } finally {
+        dom.importInput.value = "";
       }
+    };
+    reader.onerror = () => {
+      showToast("导入失败：无法读取 JSON 文件。", { tone: "error", duration: 4200 });
+      dom.importInput.value = "";
     };
     reader.readAsText(file);
   }
@@ -1139,6 +1611,7 @@
   }
 
   function render() {
+    renderProfileControls();
     renderTabsAndFilters();
     renderStickPanel("left");
     renderStickPanel("right");
@@ -1161,6 +1634,16 @@
     saveState();
     render();
   });
+  dom.profileSelect.addEventListener("change", (event) => setActiveProfile(event.target.value));
+  dom.profileAddBtn.addEventListener("click", openProfileDialog);
+  dom.profileNewName.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      createProfileFromDialog();
+    }
+  });
+  dom.profileCreateBtn.addEventListener("click", createProfileFromDialog);
+  dom.profileDeleteBtn.addEventListener("click", requestDeleteActiveProfile);
   dom.lockBtn.addEventListener("click", toggleLock);
   dom.clearBtn.addEventListener("click", clearBinding);
   dom.noteInput.addEventListener("input", (event) => updateNote(event.target.value));
@@ -1175,5 +1658,7 @@
     selectedRowId = seed.scenarioRows[0].id;
   }
   state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
+  const initialRow = selectedRowId ? findRow(selectedRowId) : null;
+  if (initialRow && !bindingForRow(initialRow)) clearPendingTarget();
   render();
 })();

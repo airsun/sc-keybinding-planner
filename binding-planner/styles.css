@@ -53,7 +53,8 @@ body::after {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -116,7 +117,8 @@ p {
 
 .brand p,
 .selection-kicker,
-.code-dialog span {
+.code-dialog span,
+.profile-dialog span {
   margin-top: 2px;
   color: var(--muted);
   font-family: var(--mono);
@@ -855,47 +857,57 @@ p {
 .tag.red { border-color: var(--red); color: var(--red); }
 .tag.muted { color: var(--muted); }
 
-.code-dialog {
+.code-dialog,
+.profile-dialog {
   border: 1px solid var(--line-hot);
   color: var(--text);
   background: var(--panel);
   box-shadow: 0 0 34px rgba(91, 214, 208, 0.18);
 }
 
-.code-dialog::backdrop {
+.code-dialog::backdrop,
+.profile-dialog::backdrop {
   background: rgba(0, 0, 0, 0.62);
 }
 
-.code-card {
+.code-card,
+.profile-card {
   min-width: 390px;
 }
 
-.code-card h2 {
+.code-card h2,
+.profile-card h2 {
   margin: 4px 0 14px;
   font-size: 18px;
 }
 
-.code-fields {
+.code-fields,
+.profile-fields {
   display: grid;
   gap: 10px;
 }
 
-.code-fields label {
+.code-fields label,
+.profile-fields label {
   display: grid;
   gap: 4px;
   color: var(--muted);
   font-size: 12px;
 }
 
-.code-fields input {
+.code-fields input,
+.profile-fields input,
+.profile-fields select {
   height: 34px;
   border: 1px solid var(--line);
   color: var(--text);
   background: #0b1115;
   padding: 0 9px;
+  outline: 0;
 }
 
-.code-card menu {
+.code-card menu,
+.profile-card menu {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -903,7 +915,8 @@ p {
   padding: 0;
 }
 
-.code-card button {
+.code-card button,
+.profile-card button {
   min-height: 34px;
   border: 1px solid var(--line);
   color: var(--text);
@@ -2953,6 +2966,74 @@ body {
   gap: 6px;
   font-family: var(--mono);
   font-size: 13px;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.profile-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 4px 0 6px;
+  border: 1px solid rgba(214, 182, 108, 0.46);
+  background:
+    linear-gradient(90deg, rgba(102, 212, 126, 0.075), transparent 44px),
+    rgba(0, 6, 3, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(102, 212, 126, 0.08);
+}
+
+.profile-kicker {
+  color: var(--amber);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.profile-select {
+  height: 22px;
+  border: 1px solid rgba(214, 182, 108, 0.36);
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.4);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  outline: 0;
+}
+
+.profile-select {
+  width: clamp(240px, 24vw, 360px);
+  max-width: 360px;
+  padding: 0 5px;
+}
+
+.profile-select:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px rgba(243, 154, 47, 0.18);
+}
+
+.profile-controls .icon-button {
+  width: 24px;
+  min-width: 24px;
+  min-height: 22px;
+  height: 22px;
+}
+
+.profile-controls .icon-button > span[aria-hidden="true"] {
+  font-size: 13px;
+}
+
+.profile-controls .icon-button:disabled {
+  cursor: default;
+  color: rgba(125, 144, 114, 0.42);
+  border-color: rgba(89, 111, 71, 0.25);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.profile-controls .icon-button.is-protected {
+  color: rgba(125, 144, 114, 0.58);
+  border-color: rgba(89, 111, 71, 0.34);
+  background: rgba(0, 0, 0, 0.28);
 }
 
 .top-actions .search-box {
@@ -3005,10 +3086,10 @@ body {
   white-space: nowrap;
 }
 
-/* Final topbar legend: centered cockpit signal key between brand and tools. */
+/* Final topbar profile room: legend lives in the lower control rail. */
 .topbar {
   display: grid;
-  grid-template-columns: minmax(292px, 1fr) auto minmax(340px, 1fr);
+  grid-template-columns: minmax(252px, auto) minmax(0, 1fr);
   align-items: center;
   column-gap: 12px;
 }
@@ -3017,8 +3098,13 @@ body {
   justify-self: start;
 }
 
+.top-actions {
+  justify-self: end;
+}
+
 .top-legend {
-  justify-self: center;
+  flex: 0 0 auto;
+  margin-inline: auto;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -4544,4 +4630,301 @@ body {
     inset 0 0 0 1px rgba(243, 154, 47, 0.38),
     inset 4px 0 0 var(--amber),
     inset 0 -22px 46px rgba(0, 0, 0, 0.36);
+}
+
+/* Final binding operation pass: every card exposes lock and unbind controls. */
+.binding-controls,
+.binding-console.has-conflict .binding-controls {
+  grid-template-columns: auto auto minmax(82px, 1fr) 32px 34px;
+}
+
+.seg button,
+.slot-pill,
+.card-clear,
+.card-lock {
+  min-height: 30px;
+  border: 1px solid rgba(214, 182, 108, 0.36);
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(214, 182, 108, 0.08), transparent 55%),
+    #030704;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.card-clear,
+.card-lock {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+}
+
+.card-clear {
+  color: var(--muted);
+}
+
+.card-clear:hover:not(:disabled) {
+  border-color: rgba(255, 93, 77, 0.72);
+  color: var(--red);
+  box-shadow: 0 0 0 1px rgba(255, 93, 77, 0.12), 0 0 14px rgba(255, 93, 77, 0.16);
+}
+
+.card-clear:disabled {
+  cursor: default;
+  color: rgba(125, 144, 114, 0.34);
+  border-color: rgba(89, 111, 71, 0.22);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.clear-icon {
+  display: block;
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.binding-console.has-conflict .card-clear,
+.binding-console.has-conflict .card-lock {
+  min-width: 32px;
+}
+
+@media (max-width: 700px) {
+  html,
+  body {
+    height: auto;
+    min-width: 0;
+    overflow: auto;
+  }
+
+  .app-shell {
+    min-height: 100vh;
+    height: auto;
+    overflow: visible;
+  }
+
+  .topbar {
+    height: auto;
+    min-height: 48px;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+    padding: 8px;
+  }
+
+  .brand,
+  .top-legend,
+  .top-actions {
+    min-width: 0;
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .brand {
+    align-items: flex-start;
+  }
+
+  .brand h1,
+  .brand p {
+    overflow-wrap: anywhere;
+  }
+
+  .top-legend,
+  .top-actions,
+  .filters,
+  .tabs {
+    flex-wrap: wrap;
+  }
+
+  .search-box {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .profile-controls {
+    flex: 1 1 100%;
+  }
+
+  .profile-select {
+    flex: 1 1 0;
+    width: auto;
+    max-width: none;
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    overflow: visible;
+    padding: 6px;
+  }
+
+  .list-zone {
+    order: -1;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .list-controls {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .card-wrap,
+  .stick-panel {
+    overflow: visible;
+  }
+
+  .binding-card,
+  .binding-card.has-conflict {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "action"
+      "desc"
+      "meta";
+  }
+
+  .binding-console,
+  .binding-console.has-conflict {
+    grid-template-columns: 10px minmax(0, 1fr);
+  }
+
+  .binding-console.has-conflict .conflict-mini-card {
+    grid-column: 2;
+    grid-row: auto;
+  }
+
+  .binding-console.has-conflict .binding-controls {
+    grid-column: 2;
+    grid-row: auto;
+  }
+
+  .binding-controls,
+  .binding-console.has-conflict .binding-controls {
+    grid-template-columns: auto auto minmax(0, 1fr) 32px 32px;
+  }
+
+  .seg button,
+  .binding-console.has-conflict .seg button {
+    min-width: 24px;
+    padding: 0 4px;
+  }
+
+  .layer-seg button,
+  .binding-console.has-conflict .layer-seg button {
+    min-width: 30px;
+  }
+
+  .slot-pill {
+    padding: 0 6px;
+  }
+
+  .card-clear,
+  .card-lock {
+    width: 32px;
+    min-width: 32px;
+  }
+}
+
+/* Final conflict undo and cockpit icon pass. */
+.toast.countdown {
+  padding-bottom: 16px;
+}
+
+.toast-countdown {
+  display: inline-block;
+  min-width: 22px;
+  margin-left: 8px;
+  color: var(--amber);
+  font-weight: 900;
+  text-align: right;
+  text-shadow: 0 0 9px rgba(243, 154, 47, 0.42);
+}
+
+.toast-progress {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 7px;
+  height: 2px;
+  overflow: hidden;
+  background: rgba(214, 182, 108, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+}
+
+.toast-progress::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--amber), rgba(102, 212, 126, 0.78));
+  transform-origin: left center;
+  animation: toastCountdown var(--toast-duration) linear forwards;
+}
+
+@keyframes toastCountdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* Final C text-signal controls. */
+.lock-icon,
+.clear-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: auto;
+  min-width: 24px;
+  height: 16px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: currentColor;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.lock-icon::before,
+.lock-icon::after,
+.clear-icon::before,
+.clear-icon::after {
+  content: none;
+}
+
+.lock-icon::after,
+.clear-icon::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: -2px;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.82;
+  box-shadow: none;
+  transform: none;
+}
+
+.card-lock.active .lock-icon,
+#lockBtn.active .lock-icon {
+  color: var(--amber);
+  text-shadow: 0 0 8px rgba(243, 154, 47, 0.46);
+}
+
+.card-clear:hover:not(:disabled) .clear-icon {
+  color: var(--amber);
+  text-shadow: 0 0 8px rgba(243, 154, 47, 0.42);
+}
+
+.card-lock:disabled .lock-icon,
+#lockBtn:disabled .lock-icon,
+.card-clear:disabled .clear-icon {
+  opacity: 0.42;
 }
