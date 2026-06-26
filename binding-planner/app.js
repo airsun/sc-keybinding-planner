@@ -41,7 +41,6 @@
     profileCreateBtn: document.getElementById("profileCreateBtn"),
     helpBtn: document.getElementById("helpBtn"),
     helpOverlay: document.getElementById("helpOverlay"),
-    helpLayer: document.getElementById("helpLayer"),
     helpItems: document.getElementById("helpItems"),
     helpCloseBtn: document.getElementById("helpCloseBtn"),
     hudTooltip: document.getElementById("hudTooltip"),
@@ -113,7 +112,6 @@
   let codeEditTarget = null;
   let helpOpen = false;
   let tooltipTarget = null;
-  let helpFrame = 0;
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -580,18 +578,6 @@
     return Math.min(Math.max(value, min), max);
   }
 
-  function isVisible(el) {
-    if (!el) return false;
-    const rect = el.getBoundingClientRect();
-    return rect.width > 2 && rect.height > 2 && rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth;
-  }
-
-  function visibleTargets(selectors) {
-    return selectors
-      .flatMap((selector) => Array.from(document.querySelectorAll(selector)))
-      .filter((el, index, list) => list.indexOf(el) === index && isVisible(el));
-  }
-
   function openHelpOverlay() {
     helpOpen = true;
     hideTooltip();
@@ -607,19 +593,9 @@
     dom.helpOverlay.classList.remove("open");
     dom.helpOverlay.setAttribute("aria-hidden", "true");
     document.body.classList.remove("help-open");
-    dom.helpLayer.replaceChildren();
-  }
-
-  function scheduleHelpRender() {
-    if (!helpOpen || helpFrame) return;
-    helpFrame = window.requestAnimationFrame(() => {
-      helpFrame = 0;
-      renderHelpOverlay();
-    });
   }
 
   function renderHelpOverlay() {
-    dom.helpLayer.replaceChildren();
     dom.helpItems.replaceChildren();
     let index = 1;
     helpTopics.forEach((topic) => {
@@ -642,27 +618,6 @@
     content.append(row);
     item.append(content);
     return item;
-  }
-
-  function renderHelpMarker(number, target) {
-    const rect = target.getBoundingClientRect();
-    const pad = 4;
-    const left = clamp(rect.left - pad, 6, window.innerWidth - 24);
-    const top = clamp(rect.top - pad, 6, window.innerHeight - 24);
-    const width = clamp(rect.width + pad * 2, 24, window.innerWidth - left - 6);
-    const height = clamp(rect.height + pad * 2, 18, window.innerHeight - top - 6);
-
-    const box = makeEl("div", "help-target");
-    box.style.left = `${left}px`;
-    box.style.top = `${top}px`;
-    box.style.width = `${width}px`;
-    box.style.height = `${height}px`;
-
-    const badge = makeEl("div", "help-badge", number);
-    badge.style.left = `${clamp(left - 8, 8, window.innerWidth - 40)}px`;
-    badge.style.top = `${clamp(top - 10, 8, window.innerHeight - 32)}px`;
-
-    dom.helpLayer.append(box, badge);
   }
 
   function showTooltip(target) {
@@ -1888,11 +1843,9 @@
   });
   window.addEventListener("resize", () => {
     positionTooltip();
-    scheduleHelpRender();
   });
   window.addEventListener("scroll", () => {
     positionTooltip();
-    scheduleHelpRender();
   }, true);
 
   if (!selectedRowId && seed.scenarioRows.length) {

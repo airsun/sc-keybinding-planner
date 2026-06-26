@@ -3325,48 +3325,7 @@ body {
   padding: 0;
 }
 
-.lock-icon {
-  position: relative;
-  display: block;
-  width: 13px;
-  height: 10px;
-  margin-top: 5px;
-  border: 2px solid currentColor;
-  color: var(--line-hot);
-}
-
-.lock-icon::before {
-  content: "";
-  position: absolute;
-  left: 2px;
-  top: -9px;
-  width: 5px;
-  height: 8px;
-  border: 2px solid currentColor;
-  border-bottom: 0;
-}
-
-.lock-icon::after {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 3px;
-  width: 3px;
-  height: 3px;
-  background: currentColor;
-}
-
-.card-lock.active .lock-icon,
-#lockBtn.active .lock-icon {
-  color: #130b03;
-}
-
-.card-lock:disabled .lock-icon,
-#lockBtn:disabled .lock-icon {
-  color: rgba(125, 144, 114, 0.42);
-}
-
-/* Final lock correction: flat sim-panel color and a conventional padlock glyph. */
+/* Final lock correction: flat sim-panel color and stronger locked-card backing. */
 .binding-card.locked-card {
   border-color: rgba(214, 182, 108, 0.76);
   border-left-color: var(--amber);
@@ -3381,41 +3340,6 @@ body {
   box-shadow:
     inset 0 0 0 1px rgba(243, 154, 47, 0.34),
     inset 4px 0 0 var(--amber);
-}
-
-.lock-icon {
-  width: 16px;
-  height: 12px;
-  margin-top: 7px;
-  border: 2px solid currentColor;
-  border-radius: 2px;
-  background: rgba(214, 182, 108, 0.14);
-  color: var(--line-hot);
-}
-
-.lock-icon::before {
-  left: 3px;
-  top: -11px;
-  width: 6px;
-  height: 10px;
-  border: 2px solid currentColor;
-  border-bottom: 0;
-  border-radius: 7px 7px 0 0;
-  background: transparent;
-}
-
-.lock-icon::after {
-  left: 5px;
-  top: 3px;
-  width: 3px;
-  height: 5px;
-  border-radius: 2px;
-  background: currentColor;
-}
-
-.card-lock.active .lock-icon,
-#lockBtn.active .lock-icon {
-  background: rgba(19, 11, 3, 0.16);
 }
 
 /* Final axis consistency: 6DOF axis buttons use the same visual language as A1 mini axis. */
@@ -3504,53 +3428,6 @@ body {
 #lockBtn {
   display: grid;
   place-items: center;
-}
-
-.lock-icon {
-  position: relative;
-  width: 16px;
-  height: 18px;
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--line-hot);
-}
-
-.lock-icon::before {
-  content: "";
-  position: absolute;
-  left: 3px;
-  top: 0;
-  width: 6px;
-  height: 8px;
-  border: 2px solid currentColor;
-  border-bottom: 0;
-  border-radius: 7px 7px 0 0;
-  background: transparent;
-}
-
-.lock-icon::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 16px;
-  height: 12px;
-  border: 2px solid currentColor;
-  border-radius: 2px;
-  background:
-    radial-gradient(circle at 50% 45%, currentColor 0 1.5px, transparent 2px),
-    linear-gradient(currentColor 0 0) center 63% / 2px 5px no-repeat,
-    rgba(214, 182, 108, 0.14);
-}
-
-.card-lock.active .lock-icon::after,
-#lockBtn.active .lock-icon::after {
-  background:
-    radial-gradient(circle at 50% 45%, currentColor 0 1.5px, transparent 2px),
-    linear-gradient(currentColor 0 0) center 63% / 2px 5px no-repeat,
-    rgba(19, 11, 3, 0.16);
 }
 
 /* Final axis unification: A1 mini axis and 6DOF axis share exact border and fill styling. */
@@ -3826,30 +3703,7 @@ body {
   transform: none;
 }
 
-/* Final compact lock mark and inline note expansion beside key label. */
-.lock-icon {
-  width: 14px;
-  height: 14px;
-  border: 0;
-  background:
-    linear-gradient(currentColor 0 0) center 2px / 9px 2px no-repeat,
-    linear-gradient(currentColor 0 0) center 8px / 14px 10px no-repeat;
-  color: var(--line-hot);
-}
-
-.lock-icon::before,
-.lock-icon::after {
-  display: none;
-}
-
-.card-lock.active .lock-icon,
-#lockBtn.active .lock-icon {
-  color: #130b03;
-  background:
-    linear-gradient(currentColor 0 0) center 2px / 9px 2px no-repeat,
-    linear-gradient(currentColor 0 0) center 8px / 14px 10px no-repeat;
-}
-
+/* Final inline note expansion beside key label. */
 .slot-pill {
   position: relative;
   grid-template-columns: 8px minmax(0, 1fr) auto auto;
@@ -4871,7 +4725,6 @@ body {
 }
 
 /* Final C text-signal controls. */
-.lock-icon,
 .clear-icon {
   position: relative;
   display: grid;
@@ -4891,14 +4744,11 @@ body {
   line-height: 1;
 }
 
-.lock-icon::before,
-.lock-icon::after,
 .clear-icon::before,
 .clear-icon::after {
   content: none;
 }
 
-.lock-icon::after,
 .clear-icon::after {
   content: "";
   position: absolute;
@@ -4910,12 +4760,6 @@ body {
   opacity: 0.82;
   box-shadow: none;
   transform: none;
-}
-
-.card-lock.active .lock-icon,
-#lockBtn.active .lock-icon {
-  color: var(--amber);
-  text-shadow: 0 0 8px rgba(243, 154, 47, 0.46);
 }
 
 /* Final lock control reset: use pure text, never the historical lock glyph layers. */
@@ -4962,8 +4806,6 @@ body {
   text-shadow: 0 0 8px rgba(243, 154, 47, 0.42);
 }
 
-.card-lock:disabled .lock-icon,
-#lockBtn:disabled .lock-icon,
 .card-clear:disabled .clear-icon {
   opacity: 0.42;
 }
@@ -4999,65 +4841,6 @@ body.help-open {
   background-size: auto, 100% 4px;
   box-shadow: inset 0 0 0 1px rgba(214, 182, 108, 0.2), inset 0 0 80px rgba(0, 0, 0, 0.74);
   pointer-events: auto;
-}
-
-.help-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.help-target {
-  position: fixed;
-  border: 1px solid rgba(243, 154, 47, 0.98);
-  background:
-    linear-gradient(90deg, rgba(243, 154, 47, 0.13), transparent 42%, rgba(102, 212, 126, 0.08));
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.78),
-    0 0 14px rgba(243, 154, 47, 0.3),
-    inset 0 0 18px rgba(243, 154, 47, 0.08);
-  animation: helpPulse 1.9s steps(3, end) infinite;
-}
-
-.help-target::before,
-.help-target::after {
-  content: "";
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  border-color: var(--green);
-  border-style: solid;
-  filter: drop-shadow(0 0 7px rgba(102, 212, 126, 0.32));
-}
-
-.help-target::before {
-  top: -3px;
-  left: -3px;
-  border-width: 2px 0 0 2px;
-}
-
-.help-target::after {
-  right: -3px;
-  bottom: -3px;
-  border-width: 0 2px 2px 0;
-}
-
-.help-badge {
-  position: fixed;
-  z-index: 9002;
-  display: grid;
-  place-items: center;
-  min-width: 30px;
-  height: 24px;
-  padding: 0 6px;
-  border: 1px solid rgba(243, 154, 47, 0.94);
-  background: rgba(7, 12, 7, 0.96);
-  color: var(--amber);
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 900;
-  line-height: 1;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.82), 0 0 12px rgba(243, 154, 47, 0.28);
 }
 
 .help-board {
@@ -5198,16 +4981,6 @@ body.help-open {
   transform: translateY(0);
 }
 
-@keyframes helpPulse {
-  0%,
-  100% {
-    opacity: 0.86;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
 @media (max-width: 1120px) {
   .help-board {
     top: auto;
@@ -5233,12 +5006,6 @@ body.help-open {
   background: transparent;
   box-shadow: none;
   pointer-events: auto;
-}
-
-.help-layer,
-.help-target,
-.help-badge {
-  display: none;
 }
 
 .help-board {
@@ -5437,15 +5204,8 @@ body.help-open {
     #030704;
 }
 
-.lock-icon,
 .clear-icon {
   z-index: 1;
   color: currentColor;
   text-shadow: 0 0 7px rgba(229, 236, 212, 0.16);
-}
-
-.card-lock.active .lock-icon,
-#lockBtn.active .lock-icon {
-  color: var(--amber);
-  text-shadow: 0 0 8px rgba(243, 154, 47, 0.46);
 }
