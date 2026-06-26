@@ -39,12 +39,81 @@
     profileNewName: document.getElementById("profileNewName"),
     profileSourceSelect: document.getElementById("profileSourceSelect"),
     profileCreateBtn: document.getElementById("profileCreateBtn"),
+    helpBtn: document.getElementById("helpBtn"),
+    helpOverlay: document.getElementById("helpOverlay"),
+    helpLayer: document.getElementById("helpLayer"),
+    helpItems: document.getElementById("helpItems"),
+    helpCloseBtn: document.getElementById("helpCloseBtn"),
+    hudTooltip: document.getElementById("hudTooltip"),
   };
+
+  const helpTopics = [
+    {
+      title: "Profile",
+      controls: [
+        { label: "+", note: "新增 Profile，并选择复制来源。", selector: "#profileAddBtn" },
+        { label: "×", note: "删除当前 Profile，会先确认。", selector: "#profileDeleteBtn" },
+      ],
+    },
+    {
+      title: "# 编号",
+      controls: [
+        { label: "#", note: "显示或隐藏两侧摇杆按钮编号。", selector: "#toggleCodesBtn" },
+      ],
+    },
+    {
+      title: "导入 / 导出",
+      controls: [
+        { label: "⇩", note: "导出 workspace JSON。", selector: "#exportBtn" },
+        { label: "⇧", note: "导入 workspace JSON。", selector: ".import-button" },
+      ],
+    },
+    {
+      title: "清单切换",
+      controls: [
+        { label: "场景清单", note: "按场景化体会顺序查看。", selector: "#scenarioTab" },
+        { label: "游戏顺序", note: "按游戏内 keybinding 顺序查看。", selector: "#gameTab" },
+      ],
+    },
+    {
+      title: "筛选",
+      controls: [
+        { label: "全部", note: "显示所有动作。", selector: "[data-filter='all']" },
+        { label: "已绑", note: "只看已绑定动作。", selector: "[data-filter='bound']" },
+        { label: "未分", note: "只看未分配动作。", selector: "[data-filter='unbound']" },
+        { label: "锁定", note: "只看已锁定动作。", selector: "[data-filter='locked']" },
+        { label: "问题", note: "只看冲突或待处理项。", selector: "[data-filter='issue']" },
+      ],
+    },
+    {
+      title: "锁定 / 解绑",
+      controls: [
+        { label: "REL / LCK", note: "同一个锁定按钮的两种状态。", selector: ".card-lock, #lockBtn" },
+        { label: "CLR", note: "解绑当前动作。", selector: ".card-clear, #clearBtn" },
+      ],
+    },
+    {
+      title: "L/R + Base/S1/S2",
+      controls: [
+        { label: "L / R", note: "切换左杆或右杆。", selector: ".binding-card.selected .hand-seg button" },
+        { label: "Base / S1 / S2", note: "切换基础层或 Shift 层。", selector: ".binding-card.selected .layer-seg button" },
+      ],
+    },
+    {
+      title: "点选键位",
+      controls: [
+        { label: "点选键位", note: "进入待分配状态，然后点左右摇杆按钮完成绑定。", selector: ".binding-card.selected .slot-pill" },
+      ],
+    },
+  ];
 
   let state = loadState();
   let selectedRowId = state.uiSettings.selectedRowId || null;
   let searchText = "";
   let codeEditTarget = null;
+  let helpOpen = false;
+  let tooltipTarget = null;
+  let helpFrame = 0;
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -246,9 +315,11 @@
     }
     dom.profileSelect.value = profile.id;
     dom.profileSelect.title = `当前 Profile：${profile.name}`;
+    setTooltip(dom.profileSelect, `当前 Profile：${profile.name}`);
     dom.profileDeleteBtn.disabled = false;
     dom.profileDeleteBtn.classList.toggle("is-protected", profiles.length <= 1);
     dom.profileDeleteBtn.title = profiles.length <= 1 ? "至少保留一个 Profile" : "删除当前 Profile";
+    setTooltip(dom.profileDeleteBtn, dom.profileDeleteBtn.title);
   }
 
   function setActiveProfile(profileId) {
@@ -500,6 +571,128 @@
     return el;
   }
 
+  function setTooltip(el, text) {
+    if (el && text) el.dataset.tooltip = text;
+    return el;
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function isVisible(el) {
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 2 && rect.height > 2 && rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth;
+  }
+
+  function visibleTargets(selectors) {
+    return selectors
+      .flatMap((selector) => Array.from(document.querySelectorAll(selector)))
+      .filter((el, index, list) => list.indexOf(el) === index && isVisible(el));
+  }
+
+  function openHelpOverlay() {
+    helpOpen = true;
+    hideTooltip();
+    dom.helpOverlay.classList.add("open");
+    dom.helpOverlay.setAttribute("aria-hidden", "false");
+    document.body.classList.add("help-open");
+    renderHelpOverlay();
+    window.setTimeout(() => dom.helpCloseBtn.focus({ preventScroll: true }), 0);
+  }
+
+  function closeHelpOverlay() {
+    helpOpen = false;
+    dom.helpOverlay.classList.remove("open");
+    dom.helpOverlay.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("help-open");
+    dom.helpLayer.replaceChildren();
+  }
+
+  function scheduleHelpRender() {
+    if (!helpOpen || helpFrame) return;
+    helpFrame = window.requestAnimationFrame(() => {
+      helpFrame = 0;
+      renderHelpOverlay();
+    });
+  }
+
+  function renderHelpOverlay() {
+    dom.helpLayer.replaceChildren();
+    dom.helpItems.replaceChildren();
+    let index = 1;
+    helpTopics.forEach((topic) => {
+      for (const control of topic.controls || []) {
+        const number = String(index).padStart(2, "0");
+        index += 1;
+        dom.helpItems.append(renderHelpItem(number, topic, control));
+      }
+    });
+  }
+
+  function renderHelpItem(number, topic, control) {
+    const item = makeEl("article", "help-item");
+    item.append(makeEl("span", "help-item-index", number));
+    const content = makeEl("div", "help-item-copy");
+    content.append(makeEl("h3", "", topic.title));
+    const row = makeEl("div", "help-control-row");
+    row.append(makeEl("span", "help-sample", control.label));
+    row.append(makeEl("span", "help-control-note", control.note));
+    content.append(row);
+    item.append(content);
+    return item;
+  }
+
+  function renderHelpMarker(number, target) {
+    const rect = target.getBoundingClientRect();
+    const pad = 4;
+    const left = clamp(rect.left - pad, 6, window.innerWidth - 24);
+    const top = clamp(rect.top - pad, 6, window.innerHeight - 24);
+    const width = clamp(rect.width + pad * 2, 24, window.innerWidth - left - 6);
+    const height = clamp(rect.height + pad * 2, 18, window.innerHeight - top - 6);
+
+    const box = makeEl("div", "help-target");
+    box.style.left = `${left}px`;
+    box.style.top = `${top}px`;
+    box.style.width = `${width}px`;
+    box.style.height = `${height}px`;
+
+    const badge = makeEl("div", "help-badge", number);
+    badge.style.left = `${clamp(left - 8, 8, window.innerWidth - 40)}px`;
+    badge.style.top = `${clamp(top - 10, 8, window.innerHeight - 32)}px`;
+
+    dom.helpLayer.append(box, badge);
+  }
+
+  function showTooltip(target) {
+    if ((helpOpen && !target.closest(".help-board")) || !target?.dataset.tooltip) return;
+    tooltipTarget = target;
+    dom.hudTooltip.textContent = target.dataset.tooltip;
+    dom.hudTooltip.classList.add("show");
+    dom.hudTooltip.setAttribute("aria-hidden", "false");
+    window.requestAnimationFrame(positionTooltip);
+  }
+
+  function hideTooltip() {
+    tooltipTarget = null;
+    dom.hudTooltip.classList.remove("show");
+    dom.hudTooltip.setAttribute("aria-hidden", "true");
+  }
+
+  function positionTooltip() {
+    if (!tooltipTarget || !dom.hudTooltip.classList.contains("show")) return;
+    const targetRect = tooltipTarget.getBoundingClientRect();
+    const tipRect = dom.hudTooltip.getBoundingClientRect();
+    const left = clamp(targetRect.left + targetRect.width / 2 - tipRect.width / 2, 8, window.innerWidth - tipRect.width - 8);
+    let top = targetRect.bottom + 10;
+    if (top + tipRect.height > window.innerHeight - 8) {
+      top = targetRect.top - tipRect.height - 10;
+    }
+    dom.hudTooltip.style.left = `${left}px`;
+    dom.hudTooltip.style.top = `${clamp(top, 8, window.innerHeight - tipRect.height - 8)}px`;
+  }
+
   function toastHost() {
     let host = document.getElementById("toastHost");
     if (!host) {
@@ -603,6 +796,7 @@
     for (const item of layers) {
       const button = makeEl("button", item === layer ? "active" : "", layerLabels[item]);
       button.type = "button";
+      setTooltip(button, `${handLabels[hand]} · 切换到 ${layerLabels[item]} 层`);
       button.addEventListener("click", () => setLayerForHand(hand, item));
       layerSwitch.append(button);
     }
@@ -754,6 +948,7 @@
       if (status[className]) button.classList.add(className);
     }
     button.title = `${handLabels[hand]} · ${control.label}`;
+    setTooltip(button, `${handLabels[hand]} · ${control.label} · 点击绑定当前动作`);
 
     const label = makeEl("span", "slot-label", control.label);
     button.append(label);
@@ -766,6 +961,7 @@
     edit.type = "button";
     edit.title = "编辑编码";
     edit.setAttribute("aria-label", "编辑编码");
+    setTooltip(edit, "编辑这个键位的硬件编号");
     edit.addEventListener("click", (event) => {
       event.stopPropagation();
       openCodeDialog(hand, control.id);
@@ -946,6 +1142,7 @@
       const button = makeEl("button", active ? "active" : "", hand === "left" ? "L" : "R");
       button.type = "button";
       button.title = handLabels[hand];
+      setTooltip(button, `将动作目标切到${handLabels[hand]}`);
       button.addEventListener("click", (event) => {
         event.stopPropagation();
         setBindingHand(row, hand);
@@ -973,6 +1170,7 @@
       button.type = "button";
       button.disabled = disabled;
       button.title = isAxis ? "Axis 不使用 Shift 层" : layerLabels[layer];
+      setTooltip(button, isAxis ? "Axis 不使用 Shift 层" : `将动作目标切到 ${layerLabels[layer]} 层`);
       button.addEventListener("click", (event) => {
         event.stopPropagation();
         setBindingLayer(row, layer);
@@ -987,6 +1185,7 @@
     button.role = "button";
     button.tabIndex = 0;
     button.title = binding?.slot ? "选中并在两侧键位区定位" : "选中后从左右键位区点选";
+    setTooltip(button, binding?.slot ? "定位当前绑定，左右摇杆区会同步高亮" : "进入待分配状态，然后点左右摇杆按钮绑定");
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       focusBinding(row);
@@ -1024,6 +1223,7 @@
     toggle.title = binding.note ? "查看或编辑备注" : "添加备注";
     toggle.setAttribute("aria-label", toggle.title);
     toggle.setAttribute("aria-expanded", "false");
+    setTooltip(toggle, binding.note ? "查看或编辑备注" : "添加备注");
     toggle.addEventListener("click", (event) => {
       event.stopPropagation();
       const isOpen = popover.classList.toggle("open");
@@ -1059,6 +1259,7 @@
     button.type = "button";
     button.disabled = !binding;
     setLockButtonVisual(button, Boolean(binding?.locked), binding?.locked ? "解除锁定" : "锁定当前绑定");
+    setTooltip(button, binding?.locked ? "解除这个动作的锁定" : "锁定这个动作，防止误改");
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       toggleRowLock(row);
@@ -1072,6 +1273,7 @@
     button.disabled = !binding;
     button.title = binding?.locked ? "先解除锁定再解绑" : "解绑当前绑定";
     button.setAttribute("aria-label", button.title);
+    setTooltip(button, button.title);
     button.append(makeEl("span", "clear-icon", "CLR"), makeEl("span", "sr-only", "解绑"));
     button.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -1081,7 +1283,7 @@
   }
 
   function setLockButtonVisual(button, locked, title) {
-    const icon = makeEl("span", locked ? "lock-icon locked" : "lock-icon", locked ? "LCK" : "REL");
+    const icon = makeEl("span", locked ? "lock-text locked" : "lock-text", locked ? "LCK" : "REL");
     icon.setAttribute("aria-hidden", "true");
     const text = makeEl("span", "sr-only", locked ? "解除锁定" : "锁定");
     button.replaceChildren(icon, text);
@@ -1089,6 +1291,7 @@
     button.title = title || (locked ? "解除锁定" : "锁定当前绑定");
     button.setAttribute("aria-label", locked ? "解除锁定" : "锁定当前绑定");
     button.setAttribute("aria-pressed", String(locked));
+    setTooltip(button, button.title);
   }
 
   function metaField(label, value, tone) {
@@ -1608,6 +1811,7 @@
     dom.toggleCodesBtn.classList.toggle("active", Boolean(state.uiSettings.showCodes));
     dom.toggleCodesBtn.setAttribute("aria-pressed", String(Boolean(state.uiSettings.showCodes)));
     dom.toggleCodesBtn.title = state.uiSettings.showCodes ? "隐藏编号" : "显示编号";
+    setTooltip(dom.toggleCodesBtn, state.uiSettings.showCodes ? "隐藏左右摇杆按钮编号" : "显示左右摇杆按钮编号");
   }
 
   function render() {
@@ -1653,6 +1857,43 @@
   dom.saveCodeBtn.addEventListener("click", saveCodeDialog);
   dom.copyCodeBtn.addEventListener("click", copyCodeToOtherSide);
   dom.recalcCodeBtn.addEventListener("click", recalcShiftCodes);
+  dom.helpBtn.addEventListener("click", openHelpOverlay);
+  dom.helpCloseBtn.addEventListener("click", closeHelpOverlay);
+  dom.helpOverlay.addEventListener("click", (event) => {
+    if (event.target === dom.helpOverlay || event.target.classList.contains("help-vignette")) {
+      closeHelpOverlay();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && helpOpen) {
+      event.preventDefault();
+      closeHelpOverlay();
+    }
+  });
+  document.addEventListener("pointerover", (event) => {
+    const target = event.target.closest("[data-tooltip]");
+    if (target) showTooltip(target);
+  });
+  document.addEventListener("pointerout", (event) => {
+    const target = event.target.closest("[data-tooltip]");
+    if (target && !target.contains(event.relatedTarget)) hideTooltip();
+  });
+  document.addEventListener("focusin", (event) => {
+    const target = event.target.closest("[data-tooltip]");
+    if (target) showTooltip(target);
+  });
+  document.addEventListener("focusout", (event) => {
+    const target = event.target.closest("[data-tooltip]");
+    if (target && !target.contains(event.relatedTarget)) hideTooltip();
+  });
+  window.addEventListener("resize", () => {
+    positionTooltip();
+    scheduleHelpRender();
+  });
+  window.addEventListener("scroll", () => {
+    positionTooltip();
+    scheduleHelpRender();
+  }, true);
 
   if (!selectedRowId && seed.scenarioRows.length) {
     selectedRowId = seed.scenarioRows[0].id;
