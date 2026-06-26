@@ -5209,3 +5209,166 @@ body.help-open {
   color: currentColor;
   text-shadow: 0 0 7px rgba(229, 236, 212, 0.16);
 }
+
+/* Branch preview: merge A1 mini axis with 6DOF axis, and pack HATS two-up. */
+.stick-head,
+.group-trigger,
+.group-axis,
+.group-hats,
+.group-base {
+  grid-column: 1 / -1;
+}
+
+.group-axis {
+  --group-accent: #91b28a;
+}
+
+.axis-deck {
+  display: grid;
+  gap: 6px;
+}
+
+.axis-band {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid rgba(145, 178, 138, 0.22);
+  background:
+    linear-gradient(90deg, rgba(145, 178, 138, 0.08), transparent 38%),
+    rgba(0, 0, 0, 0.1);
+}
+
+.axis-band-title {
+  width: max-content;
+  padding: 0 5px;
+  border: 1px solid rgba(145, 178, 138, 0.38);
+  color: rgba(205, 220, 190, 0.78);
+  background: rgba(1, 7, 4, 0.5);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.group-axis .axis-row-a1 .axis-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  justify-content: stretch;
+  gap: 6px;
+}
+
+.group-axis .axis-row-6dof .axis-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-content: stretch;
+  gap: 6px;
+}
+
+.group-axis .slot.axis {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+}
+
+.group-hats .hat-strips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(122px, 1fr));
+  justify-content: center;
+  gap: 7px;
+}
+
+.group-hats .hat-strip {
+  min-height: 132px;
+  padding: 16px 4px 5px;
+}
+
+.group-hats .hat-strip-title {
+  top: 4px;
+  left: 4px;
+  padding: 0 4px;
+  background: rgba(2, 10, 5, 0.9);
+  font-size: 9px;
+}
+
+.group-hats .hat-strip-grid {
+  position: relative;
+  grid-template-columns: repeat(3, 38px);
+  grid-template-rows: repeat(3, 38px);
+  justify-content: center;
+  gap: 4px;
+}
+
+.group-hats .hat-chip {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+}
+
+.hat-strip-a1 .hat-strip-grid::before {
+  content: "";
+  grid-column: 2;
+  grid-row: 2;
+  align-self: center;
+  justify-self: center;
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(145, 178, 138, 0.38);
+  background:
+    linear-gradient(90deg, transparent 40%, rgba(145, 178, 138, 0.4) 41% 59%, transparent 60%),
+    linear-gradient(0deg, transparent 40%, rgba(145, 178, 138, 0.4) 41% 59%, transparent 60%);
+  opacity: 0.78;
+}
+
+@media (max-width: 1280px) {
+  .workspace {
+    grid-template-columns: minmax(258px, 0.82fr) minmax(0, 1.9fr) minmax(258px, 0.82fr);
+  }
+
+  .stick-head {
+    padding-right: 3px;
+    padding-left: 3px;
+  }
+
+  .layer-switch {
+    grid-template-columns: repeat(3, 76px);
+    gap: 5px;
+  }
+
+  .layer-switch button {
+    width: 76px;
+  }
+
+  .group-hats {
+    padding-right: 3px;
+    padding-left: 3px;
+  }
+
+  .group-hats .hat-strips {
+    grid-template-columns: repeat(2, 122px);
+    gap: 2px;
+  }
+
+  .group-hats .hat-strip {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .group-base .base-lower-row {
+    grid-template-columns: 74px 88px 74px;
+    gap: 3px;
+  }
+
+  .group-base .base-function-row {
+    grid-template-columns: repeat(3, 74px);
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .group-base .base-panel-board,
+  .group-base .base-function-row,
+  .group-base .base-lower-row {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}

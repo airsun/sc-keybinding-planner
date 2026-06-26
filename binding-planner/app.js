@@ -759,9 +759,8 @@
     panel.append(head);
 
     renderTriggerGroup(panel, hand, controls, occ);
-    renderA1Group(panel, hand, controls, occ);
-    renderHatGroup(panel, hand, controls, occ);
     renderAxisGroup(panel, hand, controls, occ);
+    renderHatGroup(panel, hand, controls, occ);
     renderBaseGroup(panel, hand, controls, occ);
   }
 
@@ -794,57 +793,60 @@
     panel.append(group);
   }
 
-  function renderA1Group(panel, hand, controls, occ) {
-    const group = groupWrap("A1 MINI", "group-a1");
-    const axisTitle = makeEl("div", "control-subtitle", "AXIS");
-    group.append(axisTitle);
-    const axisGrid = makeEl("div", "slot-grid axis-grid");
-    for (const control of controlsByIds(controls, ["A1_axis_x", "A1_axis_y"])) {
-      axisGrid.append(renderSlot(hand, control, occ));
-    }
-    group.append(axisGrid);
-    const povTitle = makeEl("div", "control-subtitle", "POV");
-    group.append(povTitle);
-    const hat = makeEl("div", "hat a1-pov");
-    const povMap = { up: "A1_pov_up", down: "A1_pov_down", left: "A1_pov_left", right: "A1_pov_right" };
-    for (const [position, id] of Object.entries(povMap)) {
-      const control = controls.find((item) => item.id === id);
-      const slot = renderSlot(hand, control, occ);
-      slot.classList.add(position);
-      hat.append(slot);
-    }
-    group.append(hat);
-    panel.append(group);
-  }
-
   function renderHatGroup(panel, hand, controls, occ) {
     const group = groupWrap("HATS", "group-hats");
     const modules = makeEl("div", "hat-strips");
+    modules.append(renderHatModule(hand, controls, occ, "A1 POV", {
+      up: "A1_pov_up",
+      left: "A1_pov_left",
+      right: "A1_pov_right",
+      down: "A1_pov_down",
+    }, "hat-strip-a1"));
     for (const hatName of ["A3", "A4", "C1"]) {
-      const module = makeEl("div", "hat-strip");
-      const title = makeEl("div", "hat-strip-title", hatName);
-      module.append(title);
-      const hat = makeEl("div", "hat-strip-grid");
-      for (const position of ["up", "left", "press", "right", "down"]) {
-        const control = controls.find((item) => item.id === `${hatName}_${position}`);
-        const slot = renderSlot(hand, control, occ);
-        slot.classList.add(position, "hat-chip");
-        hat.append(slot);
-      }
-      module.append(hat);
-      modules.append(module);
+      modules.append(renderHatModule(hand, controls, occ, hatName, {
+        up: `${hatName}_up`,
+        left: `${hatName}_left`,
+        press: `${hatName}_press`,
+        right: `${hatName}_right`,
+        down: `${hatName}_down`,
+      }));
     }
     group.append(modules);
     panel.append(group);
   }
 
-  function renderAxisGroup(panel, hand, controls, occ) {
-    const group = groupWrap("6DOF AXIS", "group-axis");
-    const grid = makeEl("div", "slot-grid axis-grid");
-    for (const control of controlsByIds(controls, ["main_x", "main_y", "main_twist"])) {
-      grid.append(renderSlot(hand, control, occ));
+  function renderHatModule(hand, controls, occ, title, positionMap, extraClass = "") {
+    const module = makeEl("div", `hat-strip ${extraClass}`.trim());
+    module.append(makeEl("div", "hat-strip-title", title));
+    const hat = makeEl("div", "hat-strip-grid");
+    for (const [position, id] of Object.entries(positionMap)) {
+      const control = controls.find((item) => item.id === id);
+      const slot = renderSlot(hand, control, occ);
+      slot.classList.add(position, "hat-chip");
+      hat.append(slot);
     }
-    group.append(grid);
+    module.append(hat);
+    return module;
+  }
+
+  function renderAxisGroup(panel, hand, controls, occ) {
+    const group = groupWrap("AXIS", "group-axis");
+    const deck = makeEl("div", "axis-deck");
+    const rows = [
+      ["A1 MINI", "axis-row-a1", ["A1_axis_x", "A1_axis_y"]],
+      ["6DOF", "axis-row-6dof", ["main_x", "main_y", "main_twist"]],
+    ];
+    for (const [title, className, ids] of rows) {
+      const band = makeEl("div", `axis-band ${className}`);
+      band.append(makeEl("div", "axis-band-title", title));
+      const grid = makeEl("div", "slot-grid axis-grid");
+      for (const control of controlsByIds(controls, ids)) {
+        grid.append(renderSlot(hand, control, occ));
+      }
+      band.append(grid);
+      deck.append(band);
+    }
+    group.append(deck);
     panel.append(group);
   }
 
