@@ -467,6 +467,14 @@
     };
   }
 
+  function syncSlotLayerContext(slot) {
+    if (!slot?.hand) return;
+    state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
+    state.uiSettings.targetHand = slot.hand;
+    state.uiSettings.layers[slot.hand] = slot.slotType === "axis" ? "base" : slot.layer || "base";
+    delete state.uiSettings.pendingLayer;
+  }
+
   function slotKey(slot) {
     if (!slot) return "";
     if (slot.slotType === "axis") return `${slot.hand}:${slot.control}:axis`;
@@ -1117,7 +1125,6 @@
     const pendingLayer = getPendingLayer();
     for (const layer of layers) {
       const isAxis = binding?.slot?.slotType === "axis";
-      const disabled = isAxis || (control && !control.shiftCapable && layer !== "base");
       const active = binding?.slot?.slotType === "axis"
         ? layer === "base"
         : binding?.slot
@@ -1125,9 +1132,10 @@
           : row.id === selectedRowId && (targetHand ? targetLayer === layer : pendingLayer === layer);
       const button = makeEl("button", active ? "active" : "", layerLabels[layer]);
       button.type = "button";
-      button.disabled = disabled;
-      button.title = isAxis ? "Axis 不使用 Shift 层" : layerLabels[layer];
-      setTooltip(button, isAxis ? "Axis 不使用 Shift 层" : `将动作目标切到 ${layerLabels[layer]} 层`);
+      const fixedBase = Boolean(binding?.slot && control && !control.shiftCapable);
+      const fixedBaseLabel = isAxis ? "Axis 不使用 Shift 层" : `${control?.label || "当前键位"} 只支持 Base 层`;
+      button.title = (isAxis || fixedBase) && layer !== "base" ? fixedBaseLabel : layerLabels[layer];
+      setTooltip(button, (isAxis || fixedBase) && layer !== "base" ? fixedBaseLabel : `将动作目标切到 ${layerLabels[layer]} 层`);
       button.addEventListener("click", (event) => {
         event.stopPropagation();
         setBindingLayer(row, layer);
@@ -1157,19 +1165,21 @@
     const targetHand = getTargetHand();
     const targetLayer = targetHand ? getLayerForHand(targetHand) : null;
     const pendingLayer = getPendingLayer();
-    const label = makeEl("span", "slot-pill-label", binding?.slot ? slotLabel(binding.slot) : "点选键位");
-    let unboundTarget = status.label;
+    const isSelected = row.id === selectedRowId;
+    const label = makeEl("span", "slot-pill-label", binding?.slot ? slotLabel(binding.slot) : isSelected ? "待点选" : "未分配");
+    let slotMeta = "";
     if (row.id === selectedRowId) {
       if (targetHand) {
-        unboundTarget = `${targetHand === "left" ? "L" : "R"} · ${layerLabels[targetLayer]}`;
+        slotMeta = `${targetHand === "left" ? "L" : "R"} · ${layerLabels[targetLayer]}`;
       } else if (pendingLayer) {
-        unboundTarget = `${layerLabels[pendingLayer]} · 待L/R`;
-      } else {
-        unboundTarget = "待点选";
+        slotMeta = `${layerLabels[pendingLayer]} · 待L/R`;
       }
     }
-    const code = makeEl("span", "slot-pill-code", binding?.slot && state.uiSettings.showCodes ? compactCodeForSlot(binding.slot) : unboundTarget);
-    button.append(light, label, code);
+    if (binding?.slot && state.uiSettings.showCodes) {
+      slotMeta = compactCodeForSlot(binding.slot);
+    }
+    button.append(light, label);
+    if (slotMeta) button.append(makeEl("span", "slot-pill-code", slotMeta));
     return button;
   }
 
@@ -1271,12 +1281,8 @@
   function focusBinding(row) {
     selectedRowId = row.id;
     const binding = bindingForRow(row);
-    if (binding?.slot?.slotType === "button") {
-      state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
-      state.uiSettings.targetHand = binding.slot.hand;
-      state.uiSettings.layers[binding.slot.hand] = binding.slot.layer || "base";
-    } else if (binding?.slot?.hand) {
-      state.uiSettings.targetHand = binding.slot.hand;
+    if (binding?.slot) {
+      syncSlotLayerContext(binding.slot);
     } else {
       clearPendingTarget();
     }
@@ -1331,6 +1337,9 @@
       return;
     }
     if (binding.slot.slotType === "axis") {
+      if (layer !== "base") {
+        showToast("Axis 绑定固定在 Base 层；先解绑当前键位后再选择 S1/S2。", { tone: "warn" });
+      }
       focusBinding(row);
       return;
     }
@@ -1339,7 +1348,11 @@
       return;
     }
     const control = getControl(binding.slot.hand, binding.slot.control);
-    if (!control?.shiftCapable && layer !== "base") return;
+    if (!control?.shiftCapable && layer !== "base") {
+      showToast(`${control?.label || "当前键位"} 只支持 Base 层；先解绑当前键位后再选择 S1/S2。`, { tone: "warn" });
+      focusBinding(row);
+      return;
+    }
     setBindingSlot(row, { ...binding.slot, layer }, { allowConflict: true });
   }
 
@@ -1402,12 +1415,7 @@
       note: existing?.note || "",
     };
     selectedRowId = row.id;
-    if (slot.slotType === "button") {
-      state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
-      state.uiSettings.targetHand = slot.hand;
-      state.uiSettings.layers[slot.hand] = slot.layer || "base";
-      delete state.uiSettings.pendingLayer;
-    }
+    syncSlotLayerContext(slot);
     saveState();
     render();
     if (occupants.length && options.allowConflict) {
