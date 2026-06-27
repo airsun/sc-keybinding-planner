@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SC Dual VKB Binding Planner</title>
+    <link rel="stylesheet" href="./styles.css?v=retro-73">
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">VKB</span>
+          <div>
+            <h1>SC Dual VKB Binding Planner</h1>
+            <p>本地清单 · 摇杆点选 · 单 JSON 配置</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <div class="profile-controls" aria-label="Profile 配置" data-tooltip="Profile · 切换、新建或删除一套完整配置">
+            <span class="profile-kicker">PRF</span>
+            <select id="profileSelect" class="profile-select" aria-label="切换 Profile" data-tooltip="切换当前 Profile"></select>
+            <button id="profileAddBtn" class="panel-button icon-button" type="button" aria-label="新增 Profile" title="新增 Profile" data-tooltip="新增 Profile，并选择复制来源">
+              <span aria-hidden="true">+</span>
+              <span class="sr-only">新增 Profile</span>
+            </button>
+            <button id="profileDeleteBtn" class="panel-button icon-button" type="button" aria-label="删除当前 Profile" title="删除当前 Profile" data-tooltip="删除当前 Profile，会先要求确认">
+              <span aria-hidden="true">×</span>
+              <span class="sr-only">删除当前 Profile</span>
+            </button>
+          </div>
+          <label class="search-box" data-tooltip="按动作名、说明、键位或代码搜索">
+            <span>SCAN</span>
+            <input id="searchInput" type="search" placeholder="搜索动作、说明、键位">
+          </label>
+          <button id="toggleCodesBtn" class="panel-button icon-button code-mode-button" type="button" aria-label="切换编号显示" title="切换编号显示" data-tooltip="显示或隐藏左右摇杆按钮编号">
+            <span aria-hidden="true">#</span>
+            <span class="sr-only">切换编号显示</span>
+          </button>
+          <button id="exportBtn" class="panel-button icon-button" type="button" aria-label="导出 JSON" title="导出 JSON" data-tooltip="导出包含所有 Profile 和键位编号的 JSON">
+            <span aria-hidden="true">⇩</span>
+            <span class="sr-only">导出 JSON</span>
+          </button>
+          <label class="panel-button icon-button import-button" aria-label="导入 JSON" title="导入 JSON" data-tooltip="导入 JSON 并覆盖当前 workspace">
+            <span aria-hidden="true">⇧</span>
+            <span class="sr-only">导入 JSON</span>
+            <input id="importInput" type="file" accept="application/json">
+          </label>
+          <button id="helpBtn" class="panel-button icon-button help-button" type="button" aria-label="打开帮助" title="打开帮助" data-tooltip="打开全屏操作说明">
+            <span aria-hidden="true">?</span>
+            <span class="sr-only">打开帮助</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside id="leftPanel" class="stick-panel"></aside>
+
+        <section class="list-zone">
+          <div class="list-controls">
+            <div class="tabs" role="tablist" aria-label="清单类型">
+              <button id="scenarioTab" class="tab-button active" type="button" data-list="scenario" data-tooltip="按场景化体会顺序查看绑定">场景清单</button>
+              <button id="gameTab" class="tab-button" type="button" data-list="game" data-tooltip="按游戏内 keybinding 顺序查看绑定">游戏顺序</button>
+            </div>
+            <div class="top-legend" aria-label="图例说明">
+              <span class="legend-item"><span class="legend-code">L/R</span>摇杆</span>
+              <span class="legend-item"><span class="legend-code">B/S1/S2</span>层</span>
+              <span class="legend-item"><span class="legend-dot green"></span>已绑</span>
+              <span class="legend-item"><span class="legend-dot amber"></span>当前</span>
+              <span class="legend-item"><span class="legend-dot red"></span>冲突</span>
+              <span class="legend-item"><span class="legend-lock"></span>锁定</span>
+            </div>
+            <div class="filters" aria-label="状态筛选">
+              <button class="filter-button active" type="button" data-filter="all" data-tooltip="显示全部动作">全部</button>
+              <button class="filter-button" type="button" data-filter="bound" data-tooltip="只看已经绑定的动作">已绑</button>
+              <button class="filter-button" type="button" data-filter="unbound" data-tooltip="只看尚未分配的动作">未分</button>
+              <button class="filter-button" type="button" data-filter="locked" data-tooltip="只看已锁定的动作">锁定</button>
+              <button class="filter-button" type="button" data-filter="issue" data-tooltip="只看冲突或需要处理的动作">问题</button>
+            </div>
+          </div>
+
+          <div id="selectionBar" class="selection-bar">
+            <div>
+              <span class="selection-kicker">CURRENT TARGET</span>
+              <strong id="selectedTitle">选择一行动作，然后点击左右摇杆键位</strong>
+            </div>
+            <div class="selection-actions">
+              <button id="lockBtn" class="small-button" type="button" data-tooltip="锁定当前动作，防止误改或抢占">锁定</button>
+              <button id="clearBtn" class="small-button" type="button" data-tooltip="解绑当前动作">解绑</button>
+              <input id="noteInput" class="note-input" type="text" placeholder="备注" data-tooltip="为当前动作写入备注">
+            </div>
+          </div>
+
+          <div class="card-wrap">
+            <div id="bindingRows" class="binding-cards" aria-label="绑定清单"></div>
+          </div>
+        </section>
+
+        <aside id="rightPanel" class="stick-panel"></aside>
+      </main>
+    </div>
+
+    <section id="helpOverlay" class="help-overlay" aria-hidden="true" aria-label="操作帮助">
+      <div class="help-vignette" aria-hidden="true"></div>
+      <aside class="help-board" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+        <header>
+          <span>HELP</span>
+          <h2 id="helpTitle">按钮说明</h2>
+        </header>
+        <div id="helpItems" class="help-items"></div>
+        <footer>
+          <span>Esc / 点击外部关闭</span>
+          <button id="helpCloseBtn" type="button" data-tooltip="关闭帮助窗口">关闭</button>
+        </footer>
+      </aside>
+    </section>
+    <div id="hudTooltip" class="hud-tooltip" role="tooltip" aria-hidden="true"></div>
+
+    <dialog id="codeDialog" class="code-dialog">
+      <form method="dialog" class="code-card">
+        <header>
+          <span id="codeDialogKicker">CODE</span>
+          <h2 id="codeDialogTitle">编辑键位编码</h2>
+        </header>
+        <div id="codeDialogFields" class="code-fields"></div>
+        <menu>
+          <button id="copyCodeBtn" value="copy" type="button" data-tooltip="把当前键位编号复制到另一侧同名控件">复制到另一侧</button>
+          <button id="recalcCodeBtn" value="recalc" type="button" data-tooltip="按全局 shift offset 重算 S1/S2 编号">按 offset 重算</button>
+          <button value="cancel" data-tooltip="关闭编码编辑">关闭</button>
+          <button id="saveCodeBtn" value="default" type="button" data-tooltip="保存当前键位编号">保存</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="profileDialog" class="profile-dialog">
+      <form method="dialog" class="profile-card">
+        <header>
+          <span>PROFILE</span>
+          <h2>新增 Profile</h2>
+        </header>
+        <div class="profile-fields">
+          <label>
+            名称
+            <input id="profileNewName" type="text" maxlength="32" autocomplete="off">
+          </label>
+          <label>
+            复制自
+            <select id="profileSourceSelect"></select>
+          </label>
+        </div>
+        <menu>
+          <button value="cancel" data-tooltip="关闭新增 Profile">关闭</button>
+          <button id="profileCreateBtn" value="default" type="button" data-tooltip="按名称和复制来源创建 Profile">创建</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="./data.js?v=retro-4"></script>
+    <script src="./app.js?v=retro-37"></script>
+  </body>
+</html>

@@ -1,0 +1,5374 @@
+:root {
+  color-scheme: dark;
+  --bg: #020504;
+  --panel: #061a0f;
+  --panel-2: #092715;
+  --panel-3: #0d1c15;
+  --line: #596f47;
+  --line-dim: #273b28;
+  --line-hot: #d6b66c;
+  --text: #d5dcc8;
+  --muted: #7d9072;
+  --amber: #f39a2f;
+  --amber-2: #ffc069;
+  --green: #66d47e;
+  --red: #ff5d4d;
+  --violet: #a88bff;
+  --shadow: rgba(243, 154, 47, 0.18);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  height: 100%;
+  min-width: 1100px;
+  overflow: hidden;
+  margin: 0;
+  color: var(--text);
+  background:
+    linear-gradient(rgba(214, 182, 108, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(214, 182, 108, 0.035) 1px, transparent 1px),
+    radial-gradient(circle at 50% -18%, rgba(7, 54, 23, 0.9), transparent 45%),
+    var(--bg);
+  background-size: 24px 24px, 24px 24px, auto, auto;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(0, 0, 0, 0.12) 3px 4px);
+  mix-blend-mode: multiply;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+}
+
+.topbar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.08), transparent 240px),
+    #030604;
+  box-shadow: inset 0 -1px 0 rgba(243, 154, 47, 0.28);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 28px;
+  border: 1px solid var(--line-hot);
+  color: #0d1009;
+  font-weight: 800;
+  font-family: var(--mono);
+  letter-spacing: 0;
+  background: var(--line-hot);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.42);
+}
+
+h1,
+p {
+  margin: 0;
+}
+
+.brand h1 {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.brand p,
+.selection-kicker,
+.code-dialog span,
+.profile-dialog span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.top-actions,
+.list-controls,
+.filters,
+.tabs,
+.selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 260px;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  background: #020604;
+}
+
+.search-box span {
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.search-box input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  background: transparent;
+}
+
+.panel-button,
+.tab-button,
+.filter-button,
+.small-button {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(214, 182, 108, 0.08), transparent 52%),
+    #061008;
+  font-family: var(--mono);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.panel-button {
+  padding: 0 12px;
+}
+
+.import-button input {
+  display: none;
+}
+
+.tab-button {
+  padding: 0 13px;
+}
+
+.filter-button,
+.small-button {
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+.panel-button:hover,
+.tab-button:hover,
+.filter-button:hover,
+.small-button:hover,
+.slot:hover {
+  border-color: var(--line-hot);
+  box-shadow: 0 0 0 1px rgba(214, 182, 108, 0.15), 0 0 18px var(--shadow);
+}
+
+.active,
+.tab-button.active,
+.filter-button.active {
+  border-color: var(--amber);
+  color: #140c03;
+  background: var(--amber);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 196px minmax(420px, 1fr) 196px;
+  gap: 6px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 6px;
+}
+
+.stick-panel {
+  position: relative;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(rgba(214, 182, 108, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(214, 182, 108, 0.032) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(243, 154, 47, 0.05), transparent 120px),
+    var(--panel);
+  background-size: 14px 14px, 14px 14px, auto;
+  box-shadow: inset 0 0 0 1px rgba(214, 182, 108, 0.09);
+  scrollbar-gutter: stable;
+}
+
+.stick-panel::before,
+.list-zone::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--line-hot) 0 0) left top / 28px 1px no-repeat,
+    linear-gradient(var(--line-hot) 0 0) left top / 1px 28px no-repeat,
+    linear-gradient(var(--line-hot) 0 0) right top / 28px 1px no-repeat,
+    linear-gradient(var(--line-hot) 0 0) right top / 1px 28px no-repeat,
+    linear-gradient(var(--line-hot) 0 0) left bottom / 28px 1px no-repeat,
+    linear-gradient(var(--line-hot) 0 0) left bottom / 1px 28px no-repeat,
+    linear-gradient(var(--line-hot) 0 0) right bottom / 28px 1px no-repeat,
+    linear-gradient(var(--line-hot) 0 0) right bottom / 1px 28px no-repeat;
+  opacity: 0.55;
+}
+
+.stick-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.12), transparent 68%),
+    rgba(4, 16, 8, 0.96);
+}
+
+.stick-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  color: var(--line-hot);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.layer-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+}
+
+.layer-switch button {
+  height: 20px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: #020604;
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.layer-switch button.active {
+  border-color: var(--amber);
+  color: #171106;
+  background: var(--amber);
+}
+
+.control-group {
+  --group-accent: var(--line);
+  position: relative;
+  z-index: 2;
+  margin: 3px 5px;
+  padding: 3px 5px 4px;
+  border: 1px solid rgba(89, 111, 71, 0.62);
+  border-left: 2px solid var(--group-accent);
+  background:
+    linear-gradient(90deg, rgba(214, 182, 108, 0.055), transparent 32px),
+    rgba(2, 10, 5, 0.86);
+}
+
+.group-trigger { --group-accent: var(--amber); }
+.group-a1 { --group-accent: #91b28a; }
+.group-hats { --group-accent: var(--line-hot); }
+.group-axis { --group-accent: var(--green); }
+.group-base { --group-accent: #b9bd8a; }
+.group-throttle { --group-accent: #91b28a; }
+.group-encoder { --group-accent: var(--line-hot); }
+
+.group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+  color: var(--group-accent);
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1;
+  text-shadow: none;
+  text-transform: uppercase;
+}
+
+.group-title::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  margin-left: 6px;
+  background: linear-gradient(90deg, var(--group-accent), transparent);
+  opacity: 0.75;
+}
+
+.slot-grid {
+  display: grid;
+  gap: 3px;
+}
+
+.trigger-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.axis-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.base-grid {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.hat {
+  display: grid;
+  grid-template-columns: repeat(3, 34px);
+  grid-template-rows: repeat(3, 17px);
+  justify-content: center;
+  gap: 2px;
+  margin-bottom: 3px;
+}
+
+.hat .up { grid-column: 2; grid-row: 1; }
+.hat .left { grid-column: 1; grid-row: 2; }
+.hat .press { grid-column: 2; grid-row: 2; }
+.hat .right { grid-column: 3; grid-row: 2; }
+.hat .down { grid-column: 2; grid-row: 3; }
+
+.hat.a1-pov {
+  grid-template-columns: repeat(3, 34px);
+}
+
+.hat.a1-pov .slot-label {
+  font-size: 0;
+}
+
+.hat.a1-pov .slot-label::after {
+  color: var(--text);
+  font-size: 10px;
+}
+
+.hat.a1-pov .up .slot-label::after {
+  content: "^";
+}
+
+.hat.a1-pov .left .slot-label::after {
+  content: "<";
+}
+
+.hat.a1-pov .right .slot-label::after {
+  content: ">";
+}
+
+.hat.a1-pov .down .slot-label::after {
+  content: "v";
+}
+
+.hat.a1-pov .slot-code {
+  display: block;
+  font-size: 6px;
+  line-height: 1;
+}
+
+.hat.a1-pov .occupancy {
+  display: none;
+}
+
+.hat-modules {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+}
+
+.hat-module {
+  min-width: 0;
+}
+
+.hat-module-title {
+  margin-bottom: 2px;
+  color: var(--line-hot);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.hat-module .hat {
+  grid-template-columns: repeat(3, 16px);
+  grid-template-rows: repeat(3, 17px);
+  gap: 1px;
+  margin-bottom: 0;
+}
+
+.hat-module .slot {
+  min-height: 17px;
+  padding: 0;
+}
+
+.hat-module .slot-label {
+  font-size: 0;
+}
+
+.hat-module .slot-label::after {
+  color: var(--text);
+  font-size: 9px;
+}
+
+.hat-module .up .slot-label::after {
+  content: "^";
+}
+
+.hat-module .left .slot-label::after {
+  content: "<";
+}
+
+.hat-module .press .slot-label::after {
+  content: ".";
+}
+
+.hat-module .right .slot-label::after {
+  content: ">";
+}
+
+.hat-module .down .slot-label::after {
+  content: "v";
+}
+
+.hat-module .slot-code {
+  display: block;
+  font-size: 5px;
+  line-height: 1;
+}
+
+.hat-module .occupancy {
+  width: 14px;
+  margin-top: 0;
+}
+
+.slot {
+  position: relative;
+  min-height: 23px;
+  display: grid;
+  align-content: center;
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid #4f6741;
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(214, 182, 108, 0.08), transparent 48%),
+    #031006;
+  text-align: center;
+  user-select: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.group-trigger .slot {
+  border-radius: 2px 2px 8px 8px;
+  min-height: 25px;
+  color: var(--amber-2);
+  border-color: rgba(243, 154, 47, 0.65);
+}
+
+.group-hats .slot {
+  border-radius: 2px;
+  border-color: rgba(214, 182, 108, 0.62);
+}
+
+.group-a1 .slot {
+  border-color: rgba(145, 178, 138, 0.7);
+}
+
+.group-a1 .slot.axis {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(145, 178, 138, 0.18), transparent 34%),
+    linear-gradient(90deg, transparent 47%, rgba(145, 178, 138, 0.28) 48% 52%, transparent 53%),
+    linear-gradient(0deg, transparent 47%, rgba(145, 178, 138, 0.28) 48% 52%, transparent 53%),
+    #031006;
+}
+
+.group-axis .slot,
+.group-throttle .slot {
+  min-height: 24px;
+  border-style: dashed;
+  background:
+    linear-gradient(90deg, rgba(102, 212, 126, 0.1), transparent 55%),
+    #031006;
+}
+
+.group-base .slot {
+  width: 26px;
+  min-height: 26px;
+  justify-self: center;
+  border-radius: 50%;
+  aspect-ratio: 1;
+  background:
+    radial-gradient(circle, rgba(214, 182, 108, 0.16), transparent 58%),
+    #07130a;
+}
+
+.group-throttle .slot {
+  width: 38px;
+  min-height: 44px;
+  margin: 0 auto;
+  border-radius: 2px;
+  background:
+    linear-gradient(90deg, transparent 44%, rgba(102, 212, 126, 0.25) 45% 55%, transparent 56%),
+    repeating-linear-gradient(0deg, transparent 0 6px, rgba(214, 182, 108, 0.14) 6px 7px),
+    #031006;
+}
+
+.group-encoder .slot {
+  width: 32px;
+  min-height: 32px;
+  justify-self: center;
+  border-radius: 999px;
+  aspect-ratio: 1;
+  background:
+    conic-gradient(from 0deg, rgba(214, 182, 108, 0.28), transparent 18%, rgba(214, 182, 108, 0.18) 36%, transparent 58%, rgba(214, 182, 108, 0.22)),
+    #031006;
+}
+
+.slot.trigger {
+  border-radius: 6px;
+}
+
+.slot.axis {
+  border-style: dashed;
+}
+
+.slot.locked {
+  border-color: rgba(240, 185, 87, 0.75);
+  background:
+    repeating-linear-gradient(-45deg, rgba(243, 154, 47, 0.16), rgba(243, 154, 47, 0.16) 4px, transparent 4px, transparent 8px),
+    #071006;
+}
+
+.slot.occupied {
+  border-color: rgba(102, 212, 126, 0.86);
+  color: var(--green);
+}
+
+.slot.current {
+  border-color: var(--amber);
+  color: var(--amber-2);
+  box-shadow: 0 0 0 1px rgba(243, 154, 47, 0.3), 0 0 20px rgba(243, 154, 47, 0.16);
+}
+
+.slot.conflict {
+  border-color: var(--red);
+}
+
+.slot.uncalibrated {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.slot-label {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-family: var(--mono);
+}
+
+.slot-code {
+  color: var(--line-hot);
+  font-family: var(--mono);
+  font-size: 8px;
+}
+
+.code-edit {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 8px;
+  font-family: var(--mono);
+}
+
+.occupancy {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  width: 20px;
+  margin: 1px auto 0;
+}
+
+.occupancy span {
+  height: 2px;
+  background: rgba(125, 144, 114, 0.34);
+}
+
+.occupancy span.on {
+  background: var(--green);
+}
+
+.occupancy span.locked {
+  background: var(--amber);
+}
+
+.list-zone {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(rgba(214, 182, 108, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(214, 182, 108, 0.028) 1px, transparent 1px),
+    rgba(3, 13, 6, 0.92);
+  background-size: 18px 18px, 18px 18px;
+  box-shadow: inset 0 0 0 1px rgba(214, 182, 108, 0.08);
+}
+
+.list-controls {
+  position: relative;
+  z-index: 2;
+  justify-content: space-between;
+  min-height: 38px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(2, 7, 4, 0.88);
+}
+
+.selection-bar {
+  position: relative;
+  z-index: 2;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.11), transparent 48%),
+    rgba(4, 16, 8, 0.9);
+}
+
+#selectedTitle {
+  display: block;
+  margin-top: 3px;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.note-input {
+  width: 260px;
+  height: 28px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  background: #020604;
+  padding: 0 9px;
+}
+
+.card-wrap {
+  position: relative;
+  z-index: 2;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 8px 8px;
+}
+
+.binding-cards {
+  display: grid;
+  gap: 6px;
+}
+
+.card-group {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 5px 0 2px;
+  background: linear-gradient(180deg, rgba(3, 13, 6, 0.98), rgba(3, 13, 6, 0.82));
+}
+
+.card-group span {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  padding: 0 10px;
+  border-left: 3px solid var(--amber);
+  color: var(--amber);
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.16), transparent 88%),
+    rgba(2, 7, 4, 0.9);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.binding-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(170px, 0.82fr) minmax(220px, 1.18fr);
+  grid-template-areas:
+    "action meta"
+    "desc meta";
+  gap: 5px 10px;
+  min-height: 76px;
+  padding: 8px 10px;
+  border: 1px solid rgba(89, 111, 71, 0.82);
+  border-left: 3px solid rgba(214, 182, 108, 0.78);
+  background:
+    linear-gradient(90deg, rgba(214, 182, 108, 0.055), transparent 132px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 56%),
+    rgba(2, 9, 5, 0.9);
+  cursor: pointer;
+}
+
+.binding-card::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  top: 7px;
+  width: 22px;
+  height: 1px;
+  background: var(--line-hot);
+  opacity: 0.5;
+}
+
+.binding-card:hover {
+  border-color: var(--line-hot);
+  box-shadow: inset 0 0 0 1px rgba(214, 182, 108, 0.12);
+}
+
+.binding-card.selected {
+  border-color: var(--amber);
+  border-left-color: var(--amber);
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.18), transparent 160px),
+    rgba(8, 18, 7, 0.96);
+  box-shadow: inset 0 0 0 1px rgba(243, 154, 47, 0.24);
+}
+
+.card-action {
+  grid-area: action;
+  min-width: 0;
+}
+
+.card-description {
+  grid-area: desc;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.card-meta {
+  grid-area: meta;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(92px, 1fr));
+  gap: 5px;
+  align-content: center;
+}
+
+.meta-field {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.meta-label {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.empty-card {
+  padding: 18px;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  text-align: center;
+}
+
+.action-name {
+  font-weight: 750;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.action-sub {
+  margin-top: 3px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  background: #020604;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.tag.green { border-color: var(--green); color: var(--green); }
+.tag.amber { border-color: var(--amber); color: var(--amber); }
+.tag.red { border-color: var(--red); color: var(--red); }
+.tag.muted { color: var(--muted); }
+
+.code-dialog,
+.profile-dialog {
+  border: 1px solid var(--line-hot);
+  color: var(--text);
+  background: var(--panel);
+  box-shadow: 0 0 34px rgba(91, 214, 208, 0.18);
+}
+
+.code-dialog::backdrop,
+.profile-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.code-card,
+.profile-card {
+  min-width: 390px;
+}
+
+.code-card h2,
+.profile-card h2 {
+  margin: 4px 0 14px;
+  font-size: 18px;
+}
+
+.code-fields,
+.profile-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.code-fields label,
+.profile-fields label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.code-fields input,
+.profile-fields input,
+.profile-fields select {
+  height: 34px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  background: #0b1115;
+  padding: 0 9px;
+  outline: 0;
+}
+
+.code-card menu,
+.profile-card menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.code-card button,
+.profile-card button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  background: #0d151a;
+}
+
+/* Clear retro cockpit pass: index2 proportions + rover-panel line language. */
+body {
+  background:
+    linear-gradient(rgba(214, 182, 108, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(214, 182, 108, 0.026) 1px, transparent 1px),
+    radial-gradient(circle at 50% -22%, rgba(11, 66, 25, 0.78), transparent 46%),
+    #020403;
+  background-size: 28px 28px, 28px 28px, auto, auto;
+}
+
+.topbar {
+  height: 44px;
+  padding: 5px 12px;
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.12), transparent 220px),
+    #030604;
+}
+
+.brand-mark {
+  width: 68px;
+  height: 26px;
+}
+
+.brand h1 {
+  font-size: 13px;
+}
+
+.brand p {
+  font-size: 9px;
+}
+
+.search-box {
+  min-width: 260px;
+  height: 30px;
+}
+
+.panel-button,
+.tab-button,
+.filter-button,
+.small-button {
+  min-height: 30px;
+  border-color: rgba(214, 182, 108, 0.58);
+  background:
+    linear-gradient(180deg, rgba(214, 182, 108, 0.1), rgba(4, 15, 8, 0.2)),
+    #040b06;
+}
+
+.panel-button.active {
+  border-color: var(--amber);
+  color: #140c03;
+  background: var(--amber);
+}
+
+.workspace {
+  grid-template-columns: minmax(300px, 1fr) minmax(560px, 1.05fr) minmax(300px, 1fr);
+  gap: 6px;
+  padding: 6px;
+}
+
+.stick-panel {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 7px;
+  background:
+    linear-gradient(rgba(214, 182, 108, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(214, 182, 108, 0.032) 1px, transparent 1px),
+    rgba(4, 22, 10, 0.96);
+  background-size: 18px 18px, 18px 18px;
+}
+
+.stick-head {
+  margin: -7px -7px 8px;
+  padding: 7px 8px;
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.18), transparent 74%),
+    #050905;
+}
+
+.stick-title {
+  font-size: 12px;
+}
+
+.layer-switch {
+  gap: 4px;
+}
+
+.layer-switch button {
+  height: 24px;
+  font-size: 10px;
+}
+
+.control-group {
+  margin: 0 0 8px;
+  padding: 8px;
+  border: 1px solid rgba(214, 182, 108, 0.36);
+  border-left: 2px solid var(--group-accent);
+  background:
+    linear-gradient(90deg, rgba(214, 182, 108, 0.07), transparent 45px),
+    rgba(2, 9, 4, 0.9);
+}
+
+.group-title {
+  margin-bottom: 7px;
+  font-size: 9px;
+  letter-spacing: 0;
+}
+
+.slot-grid {
+  gap: 6px;
+}
+
+.trigger-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.axis-grid,
+.base-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.slot {
+  min-height: 34px;
+  padding: 4px 5px;
+  border-color: rgba(214, 182, 108, 0.45);
+  background:
+    linear-gradient(180deg, rgba(214, 182, 108, 0.1), transparent 55%),
+    #020704;
+}
+
+.slot-label {
+  font-size: 10px;
+}
+
+.slot-code {
+  font-size: 9px;
+  opacity: 0.95;
+}
+
+.code-edit {
+  width: 14px;
+  height: 14px;
+  font-size: 9px;
+}
+
+.group-trigger .slot {
+  min-height: 35px;
+  border-radius: 3px;
+}
+
+.group-a1 .slot.axis {
+  min-height: 38px;
+  border-style: dashed;
+}
+
+.hat {
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(3, 28px);
+  gap: 4px;
+  margin-bottom: 0;
+}
+
+.hat.a1-pov {
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(3, 28px);
+  margin: 0 auto;
+}
+
+.hat.a1-pov .slot-label::after {
+  font-size: 13px;
+}
+
+.hat.a1-pov .slot-code {
+  display: block;
+  font-size: 8px;
+}
+
+.hat-modules {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.hat-module {
+  padding: 4px 5px 5px;
+  border: 1px solid rgba(214, 182, 108, 0.18);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.hat-module-title {
+  margin-bottom: 4px;
+  font-size: 9px;
+}
+
+.hat-module .hat {
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(3, 26px);
+  gap: 4px;
+  margin: 0 auto;
+}
+
+.hat-module .slot {
+  min-height: 26px;
+  padding: 2px;
+}
+
+.hat-module .slot-label::after {
+  font-size: 12px;
+}
+
+.hat-module .slot-code {
+  font-size: 8px;
+}
+
+.hat-module .occupancy,
+.hat.a1-pov .occupancy {
+  display: none;
+}
+
+.hat-strips {
+  display: grid;
+  gap: 7px;
+}
+
+.hat-strip {
+  min-width: 0;
+  padding: 4px 5px 5px;
+  border: 1px solid rgba(214, 182, 108, 0.18);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.hat-strip-title {
+  margin-bottom: 4px;
+  color: var(--line-hot);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.hat-strip-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.hat-chip {
+  display: grid;
+  grid-template-columns: none;
+  grid-template-rows: none;
+  justify-content: center;
+  align-content: center;
+  min-width: 0;
+  height: 34px;
+  min-height: 34px;
+  padding: 2px;
+  margin-bottom: 0;
+}
+
+.hat-chip .slot-label {
+  font-size: 0;
+}
+
+.hat-chip .slot-label::after {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.hat-chip.up .slot-label::after {
+  content: "^";
+}
+
+.hat-chip.left .slot-label::after {
+  content: "<";
+}
+
+.hat-chip.press .slot-label::after {
+  content: ".";
+}
+
+.hat-chip.right .slot-label::after {
+  content: ">";
+}
+
+.hat-chip.down .slot-label::after {
+  content: "v";
+}
+
+.hat-chip .slot-code {
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.hat-chip .occupancy {
+  display: none;
+}
+
+.group-base .slot,
+.group-encoder .slot {
+  width: auto;
+  min-height: 38px;
+  aspect-ratio: auto;
+}
+
+.group-base .slot {
+  border-radius: 999px;
+}
+
+.group-encoder .slot {
+  border-radius: 999px;
+}
+
+.group-throttle .slot {
+  width: 58px;
+  min-height: 66px;
+}
+
+.occupancy {
+  width: 28px;
+  margin-top: 3px;
+}
+
+.occupancy span {
+  height: 3px;
+}
+
+.list-zone {
+  background:
+    linear-gradient(rgba(214, 182, 108, 0.024) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(214, 182, 108, 0.02) 1px, transparent 1px),
+    rgba(3, 11, 5, 0.94);
+  background-size: 22px 22px, 22px 22px;
+}
+
+.list-controls {
+  min-height: 40px;
+  padding: 6px 10px;
+}
+
+.selection-bar {
+  min-height: 50px;
+  padding: 7px 10px;
+}
+
+#selectedTitle {
+  font-size: 13px;
+}
+
+.binding-cards {
+  gap: 7px;
+}
+
+.binding-card {
+  min-height: 84px;
+  padding: 10px 12px;
+  border-color: rgba(214, 182, 108, 0.42);
+  border-left-color: var(--amber);
+}
+
+.card-description {
+  font-size: 12px;
+}
+
+.action-name {
+  font-size: 15px;
+}
+
+.action-sub {
+  font-size: 11px;
+}
+
+.tag {
+  min-height: 24px;
+  font-size: 12px;
+}
+
+.binding-card {
+  grid-template-columns: minmax(120px, 1fr) 360px;
+  min-height: 78px;
+}
+
+.binding-card.has-conflict {
+  grid-template-columns: minmax(110px, 1fr) 430px;
+}
+
+.binding-console {
+  grid-area: meta;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid rgba(214, 182, 108, 0.26);
+  background:
+    linear-gradient(90deg, rgba(214, 182, 108, 0.07), transparent 42%),
+    rgba(1, 6, 3, 0.62);
+}
+
+.binding-console.has-conflict {
+  grid-template-columns: 10px 112px minmax(0, 1fr);
+}
+
+.binding-console.has-conflict .binding-controls {
+  grid-column: 3;
+  grid-row: 1;
+  grid-template-columns: auto auto minmax(68px, 1fr) 28px;
+  gap: 4px;
+}
+
+.binding-console.has-conflict .seg button {
+  min-width: 24px;
+  padding: 0 4px;
+}
+
+.binding-console.has-conflict .layer-seg button {
+  min-width: 30px;
+}
+
+.binding-console.has-conflict .card-lock {
+  min-width: 28px;
+}
+
+.status-rail {
+  width: 10px;
+  min-height: 100%;
+  border: 1px solid var(--line);
+  background: rgba(125, 144, 114, 0.22);
+}
+
+.status-rail.green {
+  border-color: var(--green);
+  background: linear-gradient(180deg, rgba(102, 212, 126, 0.92), rgba(102, 212, 126, 0.22));
+  box-shadow: 0 0 10px rgba(102, 212, 126, 0.16);
+}
+
+.status-rail.amber {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, rgba(243, 154, 47, 0.92), rgba(243, 154, 47, 0.2));
+}
+
+.status-rail.red {
+  border-color: var(--red);
+  background: linear-gradient(180deg, rgba(255, 93, 77, 0.92), rgba(255, 93, 77, 0.22));
+}
+
+.status-rail.noted::after {
+  content: "";
+  display: block;
+  width: 4px;
+  height: 4px;
+  margin: 4px auto 0;
+  background: var(--line-hot);
+}
+
+.binding-controls {
+  display: grid;
+  grid-template-columns: auto auto minmax(82px, 1fr) 32px;
+  gap: 6px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.seg {
+  display: inline-grid;
+  grid-auto-flow: column;
+  gap: 2px;
+  align-self: stretch;
+  padding: 2px;
+  border: 1px solid rgba(214, 182, 108, 0.24);
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.seg button,
+.slot-pill,
+.card-lock {
+  min-height: 30px;
+  border: 1px solid rgba(214, 182, 108, 0.36);
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(214, 182, 108, 0.08), transparent 55%),
+    #030704;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.seg button {
+  min-width: 28px;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.layer-seg button {
+  min-width: 34px;
+}
+
+.seg button.active {
+  border-color: var(--amber);
+  color: #130b03;
+  background: var(--amber);
+}
+
+.seg button:disabled {
+  cursor: default;
+  color: rgba(125, 144, 114, 0.45);
+  border-color: rgba(89, 111, 71, 0.22);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.slot-pill {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+  padding: 0 8px;
+  text-align: left;
+}
+
+.slot-pill-label,
+.slot-pill-code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slot-pill-code {
+  color: var(--line-hot);
+  font-size: 10px;
+}
+
+.status-dot-ui {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.status-dot-ui.green {
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(102, 212, 126, 0.45);
+}
+
+.status-dot-ui.amber {
+  background: var(--amber);
+}
+
+.status-dot-ui.red {
+  background: var(--red);
+}
+
+.slot-pill.red {
+  border-color: rgba(255, 93, 77, 0.62);
+}
+
+.slot-pill.amber {
+  border-color: rgba(243, 154, 47, 0.62);
+}
+
+.slot-pill.green {
+  border-color: rgba(102, 212, 126, 0.48);
+}
+
+.card-lock {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  padding: 0;
+}
+
+.card-lock.active {
+  border-color: var(--amber);
+  color: #130b03;
+  background: var(--amber);
+}
+
+.card-lock:disabled {
+  cursor: default;
+  color: rgba(125, 144, 114, 0.4);
+  border-color: rgba(89, 111, 71, 0.22);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.conflict-mini-card {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+  align-items: center;
+  min-width: 0;
+  min-height: 100%;
+  margin: 0;
+  padding: 5px 6px;
+  border: 1px solid rgba(255, 93, 77, 0.62);
+  border-left: 3px solid var(--red);
+  background:
+    linear-gradient(90deg, rgba(255, 93, 77, 0.12), transparent 68%),
+    rgba(8, 3, 3, 0.74);
+}
+
+.conflict-mini-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--red);
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1;
+}
+
+.conflict-mini-tag {
+  text-transform: uppercase;
+}
+
+.conflict-mini-count {
+  color: var(--amber-2);
+}
+
+.conflict-mini-main {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conflict-mini-code {
+  color: var(--line-hot);
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.conflict-mini-action {
+  min-height: 20px;
+  padding: 0 5px;
+  border: 1px solid rgba(255, 93, 77, 0.52);
+  color: var(--red);
+  background: rgba(0, 0, 0, 0.32);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.conflict-mini-action:hover:not(:disabled) {
+  color: #130303;
+  background: var(--red);
+}
+
+.conflict-mini-action.has-locked {
+  border-color: rgba(243, 154, 47, 0.54);
+}
+
+.conflict-mini-action:disabled {
+  cursor: default;
+  color: rgba(125, 144, 114, 0.55);
+  border-color: rgba(89, 111, 71, 0.32);
+}
+
+.selection-actions {
+  gap: 6px;
+}
+
+.note-input {
+  width: 132px;
+  height: 30px;
+}
+
+/* Joystick panels are the primary operation surface: keep labels readable. */
+.stick-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 8px;
+}
+
+.stick-head,
+.group-hats,
+.group-axis,
+.group-base {
+  grid-column: 1 / -1;
+}
+
+.stick-head {
+  margin-bottom: 0;
+}
+
+.stick-title {
+  font-size: 13px;
+}
+
+.layer-switch button {
+  height: 28px;
+  font-size: 11px;
+}
+
+.control-group {
+  min-width: 0;
+  margin: 0;
+  padding: 6px;
+}
+
+.group-title,
+.hat-strip-title {
+  font-size: 10px;
+}
+
+.group-title {
+  margin-bottom: 5px;
+}
+
+.slot-grid {
+  gap: 5px;
+}
+
+.trigger-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.group-a1 .axis-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stick-panel .slot {
+  justify-items: center;
+  min-height: 42px;
+  padding: 5px 7px;
+}
+
+.stick-panel .slot-label {
+  max-width: 100%;
+  font-size: 13px;
+  line-height: 1.05;
+}
+
+.stick-panel .slot-code {
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.stick-panel .code-edit {
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.stick-panel .slot:hover .code-edit {
+  opacity: 0.85;
+}
+
+.group-trigger .slot {
+  min-height: 40px;
+}
+
+.group-a1 .slot.axis,
+.group-axis .slot {
+  min-height: 42px;
+}
+
+.hat.a1-pov {
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(3, 25px);
+  gap: 3px;
+  margin: 0 auto;
+}
+
+.hat.a1-pov .slot {
+  min-height: 25px;
+  padding: 3px;
+}
+
+.hat.a1-pov .slot-label::after {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.hat.a1-pov .slot-code {
+  font-size: 9px;
+}
+
+.hat-strip {
+  padding: 3px;
+}
+
+.hat-strips {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hat-strip-grid {
+  grid-template-columns: repeat(3, 27px);
+  grid-template-rows: repeat(3, 25px);
+  justify-content: center;
+  gap: 2px;
+}
+
+.stick-panel .hat-chip {
+  display: flex;
+  grid-template-columns: none;
+  grid-template-rows: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 25px;
+  min-height: 25px;
+  margin: 0;
+  overflow: hidden;
+}
+
+.stick-panel .hat-chip .slot-label {
+  font-size: 0;
+  line-height: 1;
+}
+
+.stick-panel .hat-chip .slot-label::after {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.stick-panel .hat-chip .slot-code {
+  display: block;
+  max-width: 100%;
+  margin: 0;
+  font-size: 8px;
+  line-height: 1;
+  text-align: center;
+}
+
+.stick-panel .hat-chip.up {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.stick-panel .hat-chip.left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.stick-panel .hat-chip.press {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.stick-panel .hat-chip.right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.stick-panel .hat-chip.down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.base-panel-board {
+  display: grid;
+  gap: 5px;
+}
+
+.base-function-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.base-lower-row {
+  display: grid;
+  grid-template-columns: 0.85fr 0.82fr 1.25fr;
+  gap: 5px;
+  align-items: stretch;
+}
+
+.base-subgroup {
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid rgba(214, 182, 108, 0.2);
+  background:
+    linear-gradient(180deg, rgba(214, 182, 108, 0.055), transparent 45%),
+    rgba(0, 0, 0, 0.14);
+}
+
+.base-subtitle {
+  margin-bottom: 3px;
+  color: var(--line-hot);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.base-sw-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.base-encoder-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.base-throttle-grid {
+  justify-items: center;
+}
+
+.group-base .slot {
+  min-height: 38px;
+}
+
+.base-function-row .slot {
+  min-height: 42px;
+  border-radius: 999px;
+}
+
+.base-sw .slot {
+  min-height: 36px;
+  padding-inline: 4px;
+  border-radius: 5px;
+}
+
+.base-throttle .slot {
+  width: 56px;
+  min-height: 56px;
+  border-radius: 3px;
+}
+
+.base-encoder .slot {
+  min-height: 36px;
+  padding-inline: 3px;
+  border-radius: 999px;
+}
+
+/* Narrower controller rails with quieter cockpit linework. */
+.workspace {
+  grid-template-columns: minmax(260px, 0.6fr) minmax(680px, 1.35fr) minmax(260px, 0.6fr);
+}
+
+.stick-panel {
+  padding: 6px;
+  background:
+    linear-gradient(rgba(214, 182, 108, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(214, 182, 108, 0.018) 1px, transparent 1px),
+    rgba(4, 18, 9, 0.96);
+  background-size: 18px 18px, 18px 18px;
+}
+
+.stick-panel::before {
+  display: none;
+}
+
+.control-group {
+  padding: 5px;
+  border-color: rgba(214, 182, 108, 0.2);
+  border-left-color: rgba(214, 182, 108, 0.42);
+  background: rgba(2, 10, 5, 0.72);
+}
+
+.group-title::after {
+  opacity: 0.34;
+}
+
+.stick-panel .slot {
+  border-color: rgba(145, 178, 138, 0.42);
+  background: rgba(2, 9, 5, 0.82);
+  box-shadow: none;
+}
+
+.slot.current {
+  box-shadow: 0 0 0 1px rgba(243, 154, 47, 0.3);
+}
+
+.slot.locked {
+  background:
+    repeating-linear-gradient(-45deg, rgba(243, 154, 47, 0.12), rgba(243, 154, 47, 0.12) 3px, transparent 3px, transparent 7px),
+    rgba(5, 12, 6, 0.86);
+}
+
+.hat-strips {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.hat-strip {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px;
+  border-color: rgba(214, 182, 108, 0.16);
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.hat-strip-title {
+  margin: 0;
+  font-size: 9px;
+}
+
+.hat-strip-grid {
+  grid-template-columns: repeat(3, 28px);
+  grid-template-rows: repeat(3, 20px);
+  justify-content: start;
+  gap: 2px;
+}
+
+.stick-panel .hat-chip {
+  width: 28px;
+  height: 20px;
+  min-height: 20px;
+  padding: 1px;
+}
+
+.stick-panel .hat-chip .slot-label::after {
+  font-size: 12px;
+}
+
+.stick-panel .hat-chip .slot-code {
+  font-size: 7px;
+}
+
+/* Final square cross override: keep this as the last joystick geometry rule. */
+.hat.a1-pov {
+  grid-template-columns: repeat(3, 38px);
+  grid-template-rows: repeat(3, 38px);
+  justify-content: center;
+  gap: 4px;
+}
+
+.hat.a1-pov .slot {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 4px 12px 4px 4px;
+}
+
+.hat-strip {
+  position: relative;
+  display: block;
+  min-height: 134px;
+  padding: 14px 6px 6px;
+}
+
+.hat-strip-title {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  z-index: 2;
+  margin: 0;
+}
+
+.hat-strip-grid {
+  grid-template-columns: repeat(3, 38px);
+  grid-template-rows: repeat(3, 38px);
+  justify-content: center;
+  gap: 4px;
+}
+
+.stick-panel .hat-chip {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 4px 12px 4px 4px;
+}
+
+.hat.a1-pov .slot-label::after,
+.stick-panel .hat-chip .slot-label::after {
+  font-size: 17px;
+}
+
+.hat.a1-pov .slot-code,
+.stick-panel .hat-chip .slot-code {
+  right: 2px;
+  bottom: 2px;
+  font-size: 7px;
+}
+
+/* Final side-rail width alignment: axis and Base Panel buttons approach each other. */
+.trigger-grid,
+.group-axis .axis-grid {
+  grid-template-columns: repeat(3, 72px);
+  justify-content: center;
+}
+
+.base-function-row {
+  grid-template-columns: repeat(3, 72px);
+  justify-content: center;
+}
+
+.group-a1 .axis-grid {
+  grid-template-columns: repeat(2, 92px);
+  justify-content: center;
+}
+
+.base-lower-row {
+  grid-template-columns: repeat(3, 72px);
+  justify-content: center;
+}
+
+.base-sw-grid,
+.base-encoder-grid {
+  grid-template-columns: 1fr;
+}
+
+/* Final card operation breathing room: keep conflict mini left, give controls a full-width lane. */
+.binding-card {
+  grid-template-columns: minmax(100px, 1fr) 438px;
+}
+
+.binding-card.has-conflict {
+  grid-template-columns: minmax(72px, 1fr) 570px;
+}
+
+.binding-console {
+  gap: 8px;
+  padding: 6px;
+}
+
+.binding-console.has-conflict {
+  grid-template-columns: 10px 112px minmax(420px, 1fr);
+}
+
+.binding-console.has-conflict .binding-controls {
+  grid-column: 3;
+  grid-row: 1;
+  grid-template-columns: auto auto minmax(118px, 1fr) 34px;
+  gap: 7px;
+}
+
+.binding-controls {
+  grid-template-columns: auto auto minmax(118px, 1fr) 34px;
+  gap: 7px;
+}
+
+.binding-controls .seg button {
+  min-width: 30px;
+  padding: 0 7px;
+}
+
+.binding-controls .layer-seg button {
+  min-width: 38px;
+}
+
+.binding-controls .card-lock {
+  min-width: 34px;
+}
+
+.slot-pill {
+  padding: 0 10px;
+  gap: 8px;
+}
+
+.group-a1 .slot.axis,
+.group-axis .slot,
+.base-function-row .slot,
+.base-sw .slot,
+.base-encoder .slot {
+  width: 100%;
+}
+
+/* Compact side-rail layer tabs: Base / S1 / S2. */
+.stick-head {
+  padding: 5px 6px;
+}
+
+.stick-title {
+  margin-bottom: 3px;
+  font-size: 12px;
+}
+
+.layer-switch {
+  grid-template-columns: repeat(3, 58px);
+  justify-content: center;
+  gap: 4px;
+}
+
+.layer-switch button {
+  width: 58px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0 4px;
+  font-size: 9px;
+}
+
+/* Final +30% control width pass for side-rail buttons; layer tabs and HATS stay unchanged. */
+.trigger-grid,
+.group-axis .axis-grid,
+.base-function-row {
+  grid-template-columns: repeat(3, 94px);
+  justify-content: center;
+}
+
+.base-lower-row {
+  grid-template-columns: repeat(3, 94px);
+  justify-content: center;
+}
+
+.group-a1 .axis-grid {
+  grid-template-columns: repeat(2, 120px);
+  justify-content: center;
+}
+
+/* Narrower side-rail button pass. */
+.trigger-grid,
+.group-axis .axis-grid,
+.base-function-row {
+  grid-template-columns: repeat(3, 58px);
+  justify-content: center;
+}
+
+.group-a1 .axis-grid {
+  grid-template-columns: repeat(2, 66px);
+  justify-content: center;
+}
+
+.base-lower-row {
+  grid-template-columns: repeat(3, 58px);
+  justify-content: center;
+}
+
+.hat.a1-pov {
+  grid-template-columns: repeat(3, 32px);
+  grid-template-rows: repeat(3, 32px);
+  gap: 4px;
+}
+
+.hat.a1-pov .slot {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 4px 9px 4px 4px;
+}
+
+.hat-strip {
+  min-height: 134px;
+}
+
+.hat-strip-grid {
+  grid-template-columns: repeat(3, 38px);
+  grid-template-rows: repeat(3, 38px);
+  gap: 4px;
+}
+
+.stick-panel .hat-chip {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 4px 12px 4px 4px;
+}
+
+.hat.a1-pov .slot-label::after,
+.stick-panel .hat-chip .slot-label::after {
+  font-size: 16px;
+}
+
+/* Tighter button width pass: remove wide slabs, keep square hats. */
+.trigger-grid,
+.group-axis .axis-grid,
+.base-function-row {
+  grid-template-columns: repeat(3, 68px);
+  justify-content: center;
+}
+
+.group-a1 .axis-grid {
+  grid-template-columns: repeat(2, 76px);
+  justify-content: center;
+}
+
+.hat.a1-pov {
+  grid-template-columns: repeat(3, 34px);
+  grid-template-rows: repeat(3, 34px);
+}
+
+.hat.a1-pov .slot {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 4px 10px 4px 4px;
+}
+
+.hat-strip {
+  min-height: 122px;
+}
+
+.hat-strip-grid {
+  grid-template-columns: repeat(3, 34px);
+  grid-template-rows: repeat(3, 34px);
+}
+
+.stick-panel .hat-chip {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 4px 10px 4px 4px;
+}
+
+.base-lower-row {
+  grid-template-columns: 68px 68px 68px;
+  justify-content: center;
+}
+
+.base-sw-grid,
+.base-encoder-grid {
+  grid-template-columns: 1fr;
+}
+
+/* Final square cross override: A1 POV and HATS use the same square button geometry. */
+.hat.a1-pov {
+  grid-template-columns: repeat(3, 38px);
+  grid-template-rows: repeat(3, 38px);
+  justify-content: center;
+  gap: 4px;
+}
+
+.hat.a1-pov .slot {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 4px 12px 4px 4px;
+}
+
+.hat-strip {
+  position: relative;
+  display: block;
+  min-height: 134px;
+  padding: 14px 6px 6px;
+}
+
+.hat-strip-title {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  z-index: 2;
+  margin: 0;
+}
+
+.hat-strip-grid {
+  grid-template-columns: repeat(3, 38px);
+  grid-template-rows: repeat(3, 38px);
+  justify-content: center;
+  gap: 4px;
+}
+
+.stick-panel .hat-chip {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 4px 12px 4px 4px;
+}
+
+.hat.a1-pov .slot-label::after,
+.stick-panel .hat-chip .slot-label::after {
+  font-size: 17px;
+}
+
+.hat.a1-pov .slot-code,
+.stick-panel .hat-chip .slot-code {
+  right: 2px;
+  bottom: 2px;
+  font-size: 7px;
+}
+
+/* Square POV/HAT controls and unified section labels. */
+.group-title,
+.control-subtitle,
+.hat-strip-title,
+.base-subtitle {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  min-height: 13px;
+  padding: 1px 5px;
+  border: 1px solid rgba(214, 182, 108, 0.22);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--line-hot);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.group-title {
+  margin-bottom: 6px;
+}
+
+.group-title::after {
+  display: none;
+}
+
+.control-subtitle {
+  margin: 7px 0 4px;
+}
+
+.group-a1 .control-subtitle:first-of-type {
+  margin-top: 0;
+}
+
+.hat.a1-pov {
+  grid-template-columns: repeat(3, 36px);
+  grid-template-rows: repeat(3, 36px);
+  justify-content: center;
+  gap: 4px;
+}
+
+.hat.a1-pov .slot {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 4px 12px 4px 4px;
+}
+
+.hat.a1-pov .slot-label::after {
+  font-size: 18px;
+}
+
+.hat.a1-pov .slot-code {
+  right: 2px;
+  bottom: 2px;
+  font-size: 7px;
+}
+
+.hat-strips {
+  gap: 6px;
+}
+
+.hat-strip {
+  position: relative;
+  display: block;
+  min-height: 140px;
+  padding: 16px 6px 6px;
+}
+
+.hat-strip-title {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  z-index: 2;
+  margin: 0;
+}
+
+.hat-strip-grid {
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(3, 40px);
+  justify-content: center;
+  gap: 4px;
+}
+
+.stick-panel .hat-chip {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 4px 12px 4px 4px;
+}
+
+.stick-panel .hat-chip .slot-label::after {
+  font-size: 18px;
+}
+
+.stick-panel .hat-chip .slot-code {
+  right: 2px;
+  bottom: 2px;
+  font-size: 7px;
+}
+
+.base-subtitle {
+  margin: 0 0 5px;
+}
+
+.stick-panel .slot:not(.axis) {
+  border-style: solid;
+}
+
+.base-subgroup {
+  border-color: rgba(214, 182, 108, 0.16);
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.group-base .slot,
+.base-function-row .slot,
+.base-sw .slot,
+.base-throttle .slot,
+.base-encoder .slot {
+  border-radius: 2px;
+}
+
+.occupancy {
+  width: 34px;
+}
+
+/* Vertical controller stack and unified control states. */
+.stick-panel {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.stick-head,
+.group-trigger,
+.group-a1,
+.group-hats,
+.group-axis,
+.group-base {
+  grid-column: 1 / -1;
+}
+
+.trigger-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.group-a1 .axis-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.group-axis .axis-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stick-panel .slot {
+  min-height: 40px;
+  justify-self: stretch;
+  width: 100%;
+  aspect-ratio: auto;
+  border: 1px solid rgba(145, 178, 138, 0.46);
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, rgba(214, 182, 108, 0.055), transparent 54%),
+    rgba(2, 9, 5, 0.84);
+  color: var(--text);
+}
+
+.stick-panel .slot.axis {
+  border-style: dashed;
+  border-color: rgba(102, 212, 126, 0.58);
+  background:
+    linear-gradient(90deg, transparent 48%, rgba(102, 212, 126, 0.22) 49% 51%, transparent 52%),
+    linear-gradient(0deg, transparent 48%, rgba(102, 212, 126, 0.14) 49% 51%, transparent 52%),
+    rgba(2, 9, 5, 0.84);
+}
+
+.stick-panel .slot.occupied {
+  border-color: rgba(102, 212, 126, 0.82);
+  color: var(--green);
+}
+
+.stick-panel .slot.current {
+  border-color: var(--amber);
+  color: var(--amber-2);
+  box-shadow: inset 0 0 0 1px rgba(243, 154, 47, 0.38);
+}
+
+.stick-panel .slot.locked {
+  border-color: rgba(240, 185, 87, 0.76);
+  color: var(--amber-2);
+  background:
+    repeating-linear-gradient(-45deg, rgba(243, 154, 47, 0.12), rgba(243, 154, 47, 0.12) 3px, transparent 3px, transparent 8px),
+    rgba(5, 12, 6, 0.86);
+}
+
+.stick-panel .slot.conflict {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.stick-panel .slot.uncalibrated {
+  border-style: dashed;
+  border-color: rgba(125, 144, 114, 0.5);
+  color: var(--muted);
+}
+
+.hat.a1-pov {
+  grid-template-columns: repeat(3, 52px);
+  grid-template-rows: repeat(3, 36px);
+  gap: 4px;
+}
+
+.hat.a1-pov .slot {
+  width: 52px;
+  min-height: 36px;
+}
+
+.hat.a1-pov .slot-label::after {
+  font-size: 18px;
+}
+
+.hat.a1-pov .slot-code {
+  font-size: 9px;
+}
+
+.hat-strips {
+  gap: 6px;
+}
+
+.hat-strip {
+  grid-template-columns: 32px 1fr;
+  min-height: 114px;
+  padding: 5px 6px;
+}
+
+.hat-strip-grid {
+  grid-template-columns: repeat(3, 60px);
+  grid-template-rows: repeat(3, 36px);
+  justify-content: center;
+  gap: 4px;
+}
+
+.stick-panel .hat-chip {
+  width: 60px;
+  height: 36px;
+  min-height: 36px;
+  padding: 3px;
+}
+
+.stick-panel .hat-chip .slot-label::after {
+  font-size: 17px;
+}
+
+.stick-panel .hat-chip .slot-code {
+  font-size: 8px;
+}
+
+.base-function-row,
+.base-sw-grid,
+.base-encoder-grid {
+  gap: 5px;
+}
+
+.base-lower-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.base-sw-grid,
+.base-encoder-grid {
+  grid-template-columns: 1fr;
+}
+
+.group-base .slot,
+.base-function-row .slot,
+.base-sw .slot,
+.base-throttle .slot,
+.base-encoder .slot {
+  min-height: 40px;
+  border-radius: 2px;
+}
+
+.base-throttle .slot {
+  width: 100%;
+  min-height: 52px;
+}
+
+/* Compact button content: primary label centered, metadata as badges. */
+.stick-panel .slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 5px 18px 6px 7px;
+  overflow: hidden;
+}
+
+.stick-panel .slot-label {
+  display: block;
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1;
+  text-align: center;
+  white-space: normal;
+}
+
+.stick-panel .slot-code {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  max-width: 42px;
+  padding: 0 2px;
+  border: 1px solid rgba(214, 182, 108, 0.18);
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--line-hot);
+  font-size: 8px;
+  line-height: 1.05;
+}
+
+.stick-panel .occupancy {
+  position: absolute;
+  left: 5px;
+  right: auto;
+  bottom: 4px;
+  width: 22px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.stick-panel .occupancy span {
+  height: 2px;
+}
+
+.stick-panel .code-edit {
+  top: 1px;
+  right: 2px;
+  width: 13px;
+  height: 13px;
+  font-size: 8px;
+}
+
+.group-trigger .slot,
+.group-base .slot,
+.base-function-row .slot,
+.base-sw .slot,
+.base-encoder .slot {
+  min-height: 34px;
+}
+
+.group-a1 .slot.axis,
+.group-axis .slot {
+  min-height: 36px;
+}
+
+.base-throttle .slot {
+  min-height: 46px;
+}
+
+.hat.a1-pov {
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(3, 30px);
+  gap: 3px;
+}
+
+.hat.a1-pov .slot {
+  width: 46px;
+  min-height: 30px;
+  padding: 4px 16px 4px 5px;
+}
+
+.hat.a1-pov .slot-label::after {
+  font-size: 17px;
+}
+
+.hat-strip {
+  min-height: 98px;
+}
+
+.hat-strip-grid {
+  grid-template-columns: repeat(3, 52px);
+  grid-template-rows: repeat(3, 30px);
+  gap: 3px;
+}
+
+.stick-panel .hat-chip {
+  width: 52px;
+  height: 30px;
+  min-height: 30px;
+  padding: 3px 16px 3px 5px;
+}
+
+.stick-panel .hat-chip .slot-label::after {
+  font-size: 16px;
+}
+
+.stick-panel .hat-chip .slot-code {
+  font-size: 7px;
+}
+
+/* Final square cross override: keep this as the last joystick geometry rule. */
+.hat.a1-pov {
+  grid-template-columns: repeat(3, 38px);
+  grid-template-rows: repeat(3, 38px);
+  justify-content: center;
+  gap: 4px;
+}
+
+.hat.a1-pov .slot {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 4px 12px 4px 4px;
+}
+
+.hat-strip {
+  position: relative;
+  display: block;
+  min-height: 134px;
+  padding: 14px 6px 6px;
+}
+
+.hat-strip-title {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  z-index: 2;
+  margin: 0;
+}
+
+.hat-strip-grid {
+  grid-template-columns: repeat(3, 38px);
+  grid-template-rows: repeat(3, 38px);
+  justify-content: center;
+  gap: 4px;
+}
+
+.stick-panel .hat-chip {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 4px 12px 4px 4px;
+}
+
+.hat.a1-pov .slot-label::after,
+.stick-panel .hat-chip .slot-label::after {
+  font-size: 17px;
+}
+
+.hat.a1-pov .slot-code,
+.stick-panel .hat-chip .slot-code {
+  right: 2px;
+  bottom: 2px;
+  font-size: 7px;
+}
+
+/* Final side-rail width alignment: axis and Base Panel buttons approach each other. */
+.trigger-grid,
+.group-axis .axis-grid {
+  grid-template-columns: repeat(3, 72px);
+  justify-content: center;
+}
+
+.base-function-row {
+  grid-template-columns: repeat(3, 72px);
+  justify-content: center;
+}
+
+.group-a1 .axis-grid {
+  grid-template-columns: repeat(2, 92px);
+  justify-content: center;
+}
+
+.base-lower-row {
+  grid-template-columns: repeat(3, 72px);
+  justify-content: center;
+}
+
+.base-sw-grid,
+.base-encoder-grid {
+  grid-template-columns: 1fr;
+}
+
+.group-a1 .slot.axis,
+.group-axis .slot,
+.base-function-row .slot,
+.base-sw .slot,
+.base-encoder .slot {
+  width: 100%;
+}
+
+/* Final compact layer tabs: Base / S1 / S2. */
+.stick-head {
+  padding: 5px 6px;
+}
+
+.stick-title {
+  margin-bottom: 3px;
+  font-size: 12px;
+}
+
+.layer-switch {
+  grid-template-columns: repeat(3, 58px);
+  justify-content: center;
+  gap: 4px;
+}
+
+.layer-switch button {
+  width: 58px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0 4px;
+  font-size: 9px;
+}
+
+/* Final +30% control width pass for side-rail buttons; layer tabs and HATS stay unchanged. */
+.trigger-grid,
+.group-axis .axis-grid,
+.base-function-row {
+  grid-template-columns: repeat(3, 94px);
+  justify-content: center;
+}
+
+.base-lower-row {
+  grid-template-columns: repeat(3, 94px);
+  justify-content: center;
+}
+
+.group-a1 .axis-grid {
+  grid-template-columns: repeat(2, 120px);
+  justify-content: center;
+}
+
+/* Final layout optimization: compact fewer Base controls, reserve full operation width beside conflicts. */
+.base-lower-row {
+  grid-template-columns: 78px 104px 78px;
+  justify-content: center;
+}
+
+.base-sw-grid,
+.base-encoder-grid {
+  grid-template-columns: 1fr;
+}
+
+.base-throttle .slot {
+  width: 100%;
+}
+
+.binding-card.has-conflict {
+  grid-template-columns: minmax(90px, 1fr) 500px;
+}
+
+.binding-console.has-conflict {
+  grid-template-columns: 10px 112px 360px;
+}
+
+.binding-console.has-conflict .binding-controls {
+  grid-column: 3;
+  grid-row: 1;
+  grid-template-columns: auto auto minmax(82px, 1fr) 32px;
+  gap: 6px;
+}
+
+.binding-console.has-conflict .seg button {
+  min-width: 28px;
+  padding: 0 6px;
+}
+
+.binding-console.has-conflict .layer-seg button {
+  min-width: 34px;
+}
+
+.binding-console.has-conflict .card-lock {
+  min-width: 32px;
+}
+
+/* Final vertical width rhythm: all side-rail button bands share one visual width. */
+.layer-switch {
+  grid-template-columns: repeat(3, 82px);
+  justify-content: center;
+  gap: 7px;
+}
+
+.layer-switch button {
+  width: 82px;
+  height: 24px;
+  min-height: 24px;
+  font-size: 10px;
+}
+
+.trigger-grid,
+.group-axis .axis-grid,
+.base-function-row {
+  grid-template-columns: repeat(3, 82px);
+  justify-content: center;
+  gap: 7px;
+}
+
+.group-a1 .axis-grid {
+  grid-template-columns: repeat(2, 126px);
+  justify-content: center;
+  gap: 8px;
+}
+
+.base-lower-row {
+  grid-template-columns: 78px 96px 78px;
+  justify-content: center;
+  gap: 4px;
+}
+
+.base-sw-grid,
+.base-encoder-grid {
+  grid-template-columns: 1fr;
+}
+
+/* Final card operation breathing room: keep conflict mini left, give controls a full-width lane. */
+.binding-card {
+  grid-template-columns: minmax(100px, 1fr) 438px;
+}
+
+.binding-card.has-conflict {
+  grid-template-columns: minmax(72px, 1fr) 570px;
+}
+
+.binding-console {
+  gap: 8px;
+  padding: 6px;
+}
+
+.binding-console.has-conflict {
+  grid-template-columns: 10px 112px minmax(420px, 1fr);
+}
+
+.binding-console.has-conflict .binding-controls {
+  grid-column: 3;
+  grid-row: 1;
+  grid-template-columns: auto auto minmax(118px, 1fr) 34px;
+  gap: 7px;
+}
+
+.binding-controls {
+  grid-template-columns: auto auto minmax(118px, 1fr) 34px;
+  gap: 7px;
+}
+
+.binding-controls .seg button {
+  min-width: 30px;
+  padding: 0 7px;
+}
+
+.binding-controls .layer-seg button {
+  min-width: 38px;
+}
+
+.binding-controls .card-lock {
+  min-width: 34px;
+}
+
+.slot-pill {
+  padding: 0 10px;
+  gap: 8px;
+}
+
+/* Final card layer selector scale-up: Base / S1 / S2 +30%. */
+.binding-card .layer-seg {
+  gap: 3px;
+}
+
+.binding-card .layer-seg button {
+  min-width: 50px;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Final topbar tool alignment: right tools match the title band, import/export are icon controls. */
+.top-actions {
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 13px;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.profile-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 4px 0 6px;
+  border: 1px solid rgba(214, 182, 108, 0.46);
+  background:
+    linear-gradient(90deg, rgba(102, 212, 126, 0.075), transparent 44px),
+    rgba(0, 6, 3, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(102, 212, 126, 0.08);
+}
+
+.profile-kicker {
+  color: var(--amber);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.profile-select {
+  height: 22px;
+  border: 1px solid rgba(214, 182, 108, 0.36);
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.4);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  outline: 0;
+}
+
+.profile-select {
+  width: clamp(240px, 24vw, 360px);
+  max-width: 360px;
+  padding: 0 5px;
+}
+
+.profile-select:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px rgba(243, 154, 47, 0.18);
+}
+
+.profile-controls .icon-button {
+  width: 24px;
+  min-width: 24px;
+  min-height: 22px;
+  height: 22px;
+}
+
+.profile-controls .icon-button > span[aria-hidden="true"] {
+  font-size: 13px;
+}
+
+.profile-controls .icon-button:disabled {
+  cursor: default;
+  color: rgba(125, 144, 114, 0.42);
+  border-color: rgba(89, 111, 71, 0.25);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.profile-controls .icon-button.is-protected {
+  color: rgba(125, 144, 114, 0.58);
+  border-color: rgba(89, 111, 71, 0.34);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.top-actions .search-box {
+  height: 30px;
+  min-width: 250px;
+}
+
+.top-actions .search-box span {
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.top-actions .search-box input {
+  font-size: 12px;
+}
+
+.top-actions .panel-button {
+  min-height: 30px;
+  font-size: 13px;
+}
+
+.icon-button {
+  display: inline-grid;
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+  place-items: center;
+  line-height: 1;
+}
+
+.icon-button > span[aria-hidden="true"] {
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.code-mode-button > span[aria-hidden="true"] {
+  font-size: 15px;
+}
+
+.import-button {
+  cursor: pointer;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Final topbar profile room: legend lives in the lower control rail. */
+.topbar {
+  display: grid;
+  grid-template-columns: minmax(252px, auto) minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+}
+
+.brand {
+  justify-self: start;
+}
+
+.top-actions {
+  justify-self: end;
+}
+
+.top-legend {
+  flex: 0 0 auto;
+  margin-inline: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 8px;
+  border: 1px solid rgba(214, 182, 108, 0.34);
+  background:
+    linear-gradient(90deg, rgba(214, 182, 108, 0.1), transparent 50%, rgba(214, 182, 108, 0.07)),
+    rgba(1, 7, 4, 0.76);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.legend-item + .legend-item::before {
+  content: "";
+  width: 1px;
+  height: 12px;
+  margin-right: 2px;
+  background: rgba(214, 182, 108, 0.24);
+}
+
+.legend-code {
+  min-width: 18px;
+  padding: 1px 4px;
+  border: 1px solid rgba(214, 182, 108, 0.38);
+  color: var(--line-hot);
+  background: rgba(0, 0, 0, 0.24);
+  text-align: center;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border: 1px solid currentColor;
+  background: currentColor;
+}
+
+.legend-dot.green {
+  color: var(--green);
+}
+
+.legend-dot.amber {
+  color: var(--amber);
+}
+
+.legend-dot.red {
+  color: var(--red);
+}
+
+.legend-lock {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--line-hot);
+  box-shadow: inset 0 0 0 2px rgba(214, 182, 108, 0.16);
+}
+
+.top-actions {
+  justify-self: end;
+}
+
+/* Final side-rail layer scale: Base/S1/S2 match the key-button band; stick title stays compact. */
+.layer-switch {
+  grid-template-columns: repeat(3, 82px);
+  justify-content: center;
+  gap: 7px;
+}
+
+.layer-switch button {
+  width: 82px;
+  height: 34px;
+  min-height: 34px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Final side-rail title scale: enlarge corner labels without changing panel geometry. */
+.stick-title {
+  margin-bottom: 5px;
+  font-size: 15px;
+  line-height: 1.1;
+}
+
+.stick-title .tag {
+  min-height: 22px;
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.group-title {
+  margin-bottom: 6px;
+  min-height: 18px;
+  padding: 2px 7px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.control-subtitle,
+.hat-strip-title,
+.base-subtitle {
+  min-height: 17px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.hat-strip-title {
+  margin-bottom: 4px;
+}
+
+.base-subtitle {
+  margin-bottom: 5px;
+}
+
+/* Final typography fit pass: keep hierarchy, reduce oversized labels. */
+.tab-button {
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.filter-button,
+.small-button {
+  font-size: 11px;
+}
+
+.selection-kicker {
+  font-size: 9px;
+}
+
+#selectedTitle {
+  font-size: 13px;
+}
+
+.top-legend {
+  font-size: 9px;
+}
+
+.legend-code {
+  padding: 1px 3px;
+}
+
+.stick-title {
+  margin-bottom: 4px;
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.stick-title .tag {
+  min-height: 20px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+
+.layer-switch button {
+  font-size: 11px;
+}
+
+.group-title {
+  min-height: 17px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+.control-subtitle,
+.hat-strip-title,
+.base-subtitle {
+  min-height: 16px;
+  padding: 1px 5px;
+  font-size: 10px;
+}
+
+.action-name {
+  font-size: 14px;
+}
+
+.action-sub {
+  font-size: 10px;
+}
+
+/* Final lock affordance: icon buttons plus whole-card locked background. */
+.binding-card.locked-card {
+  border-color: rgba(243, 154, 47, 0.72);
+  border-left-color: var(--amber);
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.2), transparent 165px),
+    linear-gradient(180deg, rgba(243, 154, 47, 0.13), rgba(243, 154, 47, 0.035) 58%),
+    rgba(13, 12, 4, 0.95);
+  box-shadow:
+    inset 0 0 0 1px rgba(243, 154, 47, 0.18),
+    inset 0 -18px 38px rgba(243, 154, 47, 0.05);
+}
+
+.binding-card.locked-card.selected {
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.28), transparent 178px),
+    linear-gradient(180deg, rgba(243, 154, 47, 0.17), rgba(243, 154, 47, 0.05) 62%),
+    rgba(15, 13, 4, 0.98);
+  box-shadow:
+    inset 0 0 0 1px rgba(243, 154, 47, 0.34),
+    0 0 18px rgba(243, 154, 47, 0.08);
+}
+
+.card-lock,
+#lockBtn {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+}
+
+/* Final lock correction: flat sim-panel color and stronger locked-card backing. */
+.binding-card.locked-card {
+  border-color: rgba(214, 182, 108, 0.76);
+  border-left-color: var(--amber);
+  background: rgba(25, 20, 7, 0.96);
+  box-shadow:
+    inset 0 0 0 1px rgba(214, 182, 108, 0.18),
+    inset 4px 0 0 rgba(243, 154, 47, 0.42);
+}
+
+.binding-card.locked-card.selected {
+  background: rgba(33, 25, 8, 0.98);
+  box-shadow:
+    inset 0 0 0 1px rgba(243, 154, 47, 0.34),
+    inset 4px 0 0 var(--amber);
+}
+
+/* Final axis consistency: 6DOF axis buttons use the same visual language as A1 mini axis. */
+.group-axis .slot.axis {
+  min-height: 36px;
+  border-style: dashed;
+  border-color: rgba(145, 178, 138, 0.7);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(145, 178, 138, 0.18), transparent 34%),
+    linear-gradient(90deg, transparent 47%, rgba(145, 178, 138, 0.28) 48% 52%, transparent 53%),
+    linear-gradient(0deg, transparent 47%, rgba(145, 178, 138, 0.28) 48% 52%, transparent 53%),
+    #031006;
+}
+
+.group-axis .slot.axis.occupied,
+.group-axis .slot.axis.current {
+  border-color: rgba(102, 212, 126, 0.86);
+}
+
+.group-axis .slot.axis.locked {
+  border-color: rgba(240, 185, 87, 0.75);
+}
+
+/* Final current-binding marker: stronger side-panel highlight without layout movement. */
+.stick-panel .slot.current {
+  z-index: 2;
+  overflow: visible;
+  outline: 1px solid var(--amber);
+  outline-offset: 2px;
+  box-shadow:
+    inset 0 0 0 1px rgba(243, 154, 47, 0.42),
+    0 0 0 1px rgba(243, 154, 47, 0.18);
+}
+
+.stick-panel .slot.current::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--amber) 0 0) left top / 12px 2px no-repeat,
+    linear-gradient(var(--amber) 0 0) left top / 2px 12px no-repeat,
+    linear-gradient(var(--amber) 0 0) right top / 12px 2px no-repeat,
+    linear-gradient(var(--amber) 0 0) right top / 2px 12px no-repeat,
+    linear-gradient(var(--amber) 0 0) left bottom / 12px 2px no-repeat,
+    linear-gradient(var(--amber) 0 0) left bottom / 2px 12px no-repeat,
+    linear-gradient(var(--amber) 0 0) right bottom / 12px 2px no-repeat,
+    linear-gradient(var(--amber) 0 0) right bottom / 2px 12px no-repeat;
+}
+
+.stick-panel .slot.current::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: -4px;
+  bottom: 6px;
+  width: 4px;
+  background: var(--amber);
+  pointer-events: none;
+}
+
+/* Final card note editing and lock icon alignment. */
+.card-description {
+  display: grid;
+  gap: 5px;
+}
+
+.card-note-input {
+  width: min(100%, 220px);
+  height: 23px;
+  padding: 0 7px;
+  border: 1px solid rgba(214, 182, 108, 0.28);
+  color: var(--text);
+  background: rgba(1, 7, 4, 0.72);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.card-note-input:focus {
+  outline: 0;
+  border-color: var(--amber);
+  background: rgba(5, 14, 6, 0.96);
+}
+
+.card-lock,
+#lockBtn {
+  display: grid;
+  place-items: center;
+}
+
+/* Final axis unification: A1 mini axis and 6DOF axis share exact border and fill styling. */
+.group-a1 .slot.axis,
+.group-axis .slot.axis {
+  min-height: 36px;
+  border-style: dashed;
+  border-color: rgba(145, 178, 138, 0.7);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(145, 178, 138, 0.18), transparent 34%),
+    linear-gradient(90deg, transparent 47%, rgba(145, 178, 138, 0.28) 48% 52%, transparent 53%),
+    linear-gradient(0deg, transparent 47%, rgba(145, 178, 138, 0.28) 48% 52%, transparent 53%),
+    #031006;
+}
+
+.group-a1 .slot.axis.occupied,
+.group-a1 .slot.axis.current,
+.group-axis .slot.axis.occupied,
+.group-axis .slot.axis.current {
+  border-style: dashed;
+  border-color: rgba(145, 178, 138, 0.7);
+}
+
+.group-a1 .slot.axis.locked,
+.group-axis .slot.axis.locked {
+  border-style: dashed;
+  border-color: rgba(145, 178, 138, 0.7);
+}
+
+/* Final note inline layout and current-slot attention pulse. */
+.card-description {
+  position: relative;
+  display: block;
+  min-height: 23px;
+  padding-right: 132px;
+}
+
+.card-description-text {
+  display: block;
+  overflow: hidden;
+  line-height: 23px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-note-input {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 124px;
+  height: 22px;
+  transform: translateY(-50%);
+}
+
+.stick-panel .slot.current {
+  animation: currentSlotBorderPulse 1.35s steps(2, end) infinite;
+}
+
+.stick-panel .slot.current::before {
+  animation: currentSlotCornerPulse 1.35s steps(2, end) infinite;
+}
+
+@keyframes currentSlotBorderPulse {
+  0%,
+  100% {
+    border-color: var(--amber);
+    box-shadow:
+      inset 0 0 0 1px rgba(243, 154, 47, 0.42),
+      0 0 0 1px rgba(243, 154, 47, 0.18);
+  }
+  50% {
+    border-color: var(--amber-2);
+    box-shadow:
+      inset 0 0 0 2px rgba(243, 154, 47, 0.62),
+      0 0 0 2px rgba(243, 154, 47, 0.28);
+  }
+}
+
+@keyframes currentSlotCornerPulse {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Final CRT/night-vision treatment for the selected hardware button. */
+.stick-panel .slot.current {
+  border-color: var(--amber);
+  color: var(--amber-2);
+  text-shadow:
+    0 0 4px rgba(102, 212, 126, 0.35),
+    0 0 9px rgba(243, 154, 47, 0.25);
+  animation: currentSlotCrtFlicker 2.4s steps(1, end) infinite;
+}
+
+.stick-panel .slot.current::before {
+  background:
+    linear-gradient(var(--amber) 0 0) left top / 12px 2px no-repeat,
+    linear-gradient(var(--amber) 0 0) left top / 2px 12px no-repeat,
+    linear-gradient(var(--amber) 0 0) right top / 12px 2px no-repeat,
+    linear-gradient(var(--amber) 0 0) right top / 2px 12px no-repeat,
+    linear-gradient(var(--amber) 0 0) left bottom / 12px 2px no-repeat,
+    linear-gradient(var(--amber) 0 0) left bottom / 2px 12px no-repeat,
+    linear-gradient(var(--amber) 0 0) right bottom / 12px 2px no-repeat,
+    linear-gradient(var(--amber) 0 0) right bottom / 2px 12px no-repeat,
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(102, 212, 126, 0.15) 3px 4px);
+  mix-blend-mode: screen;
+  animation: currentSlotCrtCornerFlicker 2.4s steps(1, end) infinite;
+}
+
+.stick-panel .slot.current::after {
+  background: #a9ff91;
+  box-shadow:
+    0 0 6px rgba(102, 212, 126, 0.75),
+    0 0 12px rgba(243, 154, 47, 0.22);
+  animation: currentSlotCrtSidebar 1.8s steps(2, end) infinite;
+}
+
+@keyframes currentSlotCrtFlicker {
+  0%,
+  100% {
+    outline-color: rgba(243, 154, 47, 0.82);
+    box-shadow:
+      inset 0 0 0 1px rgba(243, 154, 47, 0.46),
+      inset 0 0 12px rgba(102, 212, 126, 0.08),
+      0 0 0 1px rgba(243, 154, 47, 0.18),
+      0 0 10px rgba(102, 212, 126, 0.14);
+    filter: brightness(1);
+  }
+  18% {
+    outline-color: rgba(102, 212, 126, 0.7);
+    box-shadow:
+      inset 0 0 0 2px rgba(102, 212, 126, 0.42),
+      inset 0 0 15px rgba(102, 212, 126, 0.16),
+      0 0 0 1px rgba(102, 212, 126, 0.28),
+      0 0 14px rgba(102, 212, 126, 0.24);
+    filter: brightness(1.14);
+  }
+  23% {
+    filter: brightness(0.92);
+  }
+  48% {
+    outline-color: rgba(243, 154, 47, 0.9);
+    filter: brightness(1.08);
+  }
+  51% {
+    filter: brightness(0.88);
+  }
+  72% {
+    outline-color: rgba(102, 212, 126, 0.78);
+    filter: brightness(1.16);
+  }
+  76% {
+    filter: brightness(0.98);
+  }
+}
+
+@keyframes currentSlotCrtCornerFlicker {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  18%,
+  72% {
+    opacity: 1;
+  }
+  23%,
+  51% {
+    opacity: 0.48;
+  }
+}
+
+@keyframes currentSlotCrtSidebar {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Final note popover: remark lives beside the key label, not as a card row. */
+.card-description {
+  position: static;
+  display: block;
+  min-height: 0;
+  padding-right: 0;
+}
+
+.card-description-text {
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.slot-pill-wrap {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px;
+  gap: 4px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.slot-pill-wrap .slot-pill {
+  width: 100%;
+}
+
+.card-note-popover {
+  position: relative;
+  z-index: 7;
+  display: grid;
+  place-items: center;
+}
+
+.card-note-icon {
+  width: 22px;
+  min-width: 22px;
+  min-height: 30px;
+  border: 1px solid rgba(214, 182, 108, 0.34);
+  color: var(--muted);
+  background: #030704;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.card-note-popover.has-note .card-note-icon,
+.card-note-popover.open .card-note-icon,
+.card-note-popover:hover .card-note-icon {
+  border-color: var(--amber);
+  color: #130b03;
+  background: var(--amber);
+}
+
+.card-note-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 5px);
+  z-index: 20;
+  display: none;
+  width: 220px;
+  padding: 6px;
+  border: 1px solid rgba(214, 182, 108, 0.58);
+  background: rgba(2, 7, 4, 0.98);
+  box-shadow:
+    inset 0 0 0 1px rgba(214, 182, 108, 0.14),
+    0 8px 18px rgba(0, 0, 0, 0.35);
+}
+
+.card-note-popover:hover .card-note-panel,
+.card-note-popover:focus-within .card-note-panel,
+.card-note-popover.open .card-note-panel {
+  display: grid;
+  gap: 5px;
+}
+
+.card-note-kicker {
+  color: var(--line-hot);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.card-note-panel .card-note-input {
+  position: static;
+  width: 100%;
+  height: 25px;
+  transform: none;
+}
+
+/* Final inline note expansion beside key label. */
+.slot-pill {
+  position: relative;
+  grid-template-columns: 8px minmax(0, 1fr) auto auto;
+  overflow: visible;
+}
+
+.card-note-popover {
+  position: relative;
+  z-index: 8;
+  display: grid;
+  grid-template-columns: 18px 0;
+  align-items: center;
+  justify-self: end;
+  overflow: visible;
+  transition: grid-template-columns 160ms ease;
+}
+
+.card-note-popover.open,
+.card-note-popover:hover,
+.card-note-popover:focus-within {
+  grid-template-columns: 18px minmax(86px, 128px);
+}
+
+.card-note-icon {
+  width: 18px;
+  min-width: 18px;
+  min-height: 22px;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 14px;
+}
+
+.card-note-popover.has-note .card-note-icon,
+.card-note-popover.open .card-note-icon,
+.card-note-popover:hover .card-note-icon {
+  color: var(--amber);
+  background: transparent;
+}
+
+.card-note-panel,
+.card-note-popover:hover .card-note-panel,
+.card-note-popover:focus-within .card-note-panel,
+.card-note-popover.open .card-note-panel {
+  position: static;
+  display: block;
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.card-note-panel .card-note-input {
+  width: 118px;
+  height: 22px;
+  padding: 0 3px;
+  border: 0;
+  color: var(--text);
+  background: rgba(214, 182, 108, 0.08);
+  font-size: 10px;
+}
+
+.card-note-panel .card-note-input:focus {
+  outline: 0;
+  background: rgba(102, 212, 126, 0.1);
+}
+
+/* Final note placement: attach remark control to the action title, not the key slot. */
+.action-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.action-title-row .action-name {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.slot-pill {
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.action-title-row .card-note-popover {
+  z-index: 16;
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 18px 0;
+  align-items: center;
+  overflow: visible;
+  transition: grid-template-columns 160ms ease;
+}
+
+.action-title-row .card-note-popover.open,
+.action-title-row .card-note-popover:hover,
+.action-title-row .card-note-popover:focus-within {
+  grid-template-columns: 18px minmax(100px, 164px);
+}
+
+.action-title-row .card-note-icon {
+  width: 18px;
+  min-width: 18px;
+  min-height: 20px;
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.action-title-row .card-note-popover.has-note .card-note-icon,
+.action-title-row .card-note-popover.open .card-note-icon,
+.action-title-row .card-note-popover:hover .card-note-icon {
+  color: var(--amber);
+  background: transparent;
+}
+
+.action-title-row .card-note-panel,
+.action-title-row .card-note-popover:hover .card-note-panel,
+.action-title-row .card-note-popover:focus-within .card-note-panel,
+.action-title-row .card-note-popover.open .card-note-panel {
+  position: static;
+  display: block;
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.action-title-row .card-note-panel .card-note-input {
+  width: 150px;
+  height: 22px;
+  padding: 0 4px;
+  border: 0;
+  color: var(--text);
+  background: rgba(214, 182, 108, 0.08);
+  font-size: 10px;
+}
+
+/* Final note placement fix: title text never shares layout width with the expanded note body. */
+.action-title-row {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: minmax(0, auto) 18px;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.action-title-row .action-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-title-row .card-note-popover,
+.action-title-row .card-note-popover.open,
+.action-title-row .card-note-popover:hover,
+.action-title-row .card-note-popover:focus-within {
+  position: relative;
+  z-index: 24;
+  display: block;
+  width: 18px;
+  height: 20px;
+  overflow: visible;
+  grid-template-columns: none;
+  flex: 0 0 18px;
+  transition: none;
+}
+
+.action-title-row .card-note-icon {
+  display: grid;
+  width: 18px;
+  min-width: 18px;
+  min-height: 20px;
+  place-items: center;
+}
+
+.action-title-row .card-note-panel,
+.action-title-row .card-note-popover:hover .card-note-panel,
+.action-title-row .card-note-popover:focus-within .card-note-panel,
+.action-title-row .card-note-popover.open .card-note-panel {
+  position: absolute;
+  left: 22px;
+  top: 50%;
+  display: block;
+  width: 154px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scaleX(0);
+  transform-origin: left center;
+  transition: transform 150ms ease, opacity 120ms ease;
+}
+
+.action-title-row .card-note-popover:hover .card-note-panel,
+.action-title-row .card-note-popover:focus-within .card-note-panel,
+.action-title-row .card-note-popover.open .card-note-panel {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scaleX(1);
+}
+
+.action-title-row .card-note-panel .card-note-input {
+  width: 154px;
+  height: 22px;
+  padding: 0 5px;
+  border: 0;
+  color: var(--text);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(102, 212, 126, 0.06) 3px 4px),
+    rgba(214, 182, 108, 0.08);
+  font-size: 10px;
+}
+
+/* Final subtraction pass: remove the current-target operation strip. */
+.list-zone {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.selection-bar {
+  display: none;
+}
+
+/* Final selected-key frame: continuous CRT frame, no segmented corner marks. */
+.stick-panel .slot.current {
+  outline: 0;
+  border-color: var(--amber);
+  animation: currentSlotContinuousCrt 2.4s steps(1, end) infinite;
+}
+
+.stick-panel .slot.current::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  pointer-events: none;
+  border: 1px solid var(--amber);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(102, 212, 126, 0.12) 3px 4px),
+    rgba(102, 212, 126, 0.025);
+  box-shadow:
+    0 0 0 1px rgba(243, 154, 47, 0.18),
+    0 0 12px rgba(102, 212, 126, 0.16);
+  mix-blend-mode: screen;
+  animation: currentSlotContinuousFrame 2.4s steps(1, end) infinite;
+}
+
+.stick-panel .slot.current::after {
+  display: none;
+}
+
+@keyframes currentSlotContinuousCrt {
+  0%,
+  100% {
+    border-color: rgba(243, 154, 47, 0.9);
+    box-shadow:
+      inset 0 0 0 1px rgba(243, 154, 47, 0.44),
+      inset 0 0 10px rgba(102, 212, 126, 0.08),
+      0 0 8px rgba(102, 212, 126, 0.12);
+    filter: brightness(1);
+  }
+  18%,
+  72% {
+    border-color: rgba(102, 212, 126, 0.84);
+    box-shadow:
+      inset 0 0 0 1px rgba(102, 212, 126, 0.48),
+      inset 0 0 14px rgba(102, 212, 126, 0.14),
+      0 0 13px rgba(102, 212, 126, 0.22);
+    filter: brightness(1.12);
+  }
+  23%,
+  51% {
+    filter: brightness(0.9);
+  }
+}
+
+@keyframes currentSlotContinuousFrame {
+  0%,
+  100% {
+    opacity: 0.74;
+  }
+  18%,
+  72% {
+    opacity: 1;
+  }
+  23%,
+  51% {
+    opacity: 0.58;
+  }
+}
+
+/* Final selected-key colorway: deeper night-vision teal, distinct from amber card selection. */
+.stick-panel .slot.current {
+  border-color: #5fd6b2;
+  color: #9fffd7;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(95, 214, 178, 0.13), transparent 45%),
+    linear-gradient(180deg, rgba(14, 55, 44, 0.34), rgba(2, 13, 8, 0.92)),
+    #020905;
+  text-shadow:
+    0 0 5px rgba(95, 214, 178, 0.52),
+    0 0 12px rgba(60, 186, 150, 0.28);
+  animation: currentSlotDeepNvCrt 2.6s steps(1, end) infinite;
+}
+
+.stick-panel .slot.current::before {
+  border-color: #5fd6b2;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(95, 214, 178, 0.15) 3px 4px),
+    rgba(24, 85, 67, 0.055);
+  box-shadow:
+    0 0 0 1px rgba(95, 214, 178, 0.2),
+    0 0 14px rgba(95, 214, 178, 0.18);
+  animation: currentSlotDeepNvFrame 2.6s steps(1, end) infinite;
+}
+
+@keyframes currentSlotDeepNvCrt {
+  0%,
+  100% {
+    border-color: rgba(95, 214, 178, 0.78);
+    box-shadow:
+      inset 0 0 0 1px rgba(95, 214, 178, 0.36),
+      inset 0 0 14px rgba(19, 96, 73, 0.2),
+      0 0 10px rgba(95, 214, 178, 0.12);
+    filter: brightness(0.92) saturate(1.06);
+  }
+  17%,
+  69% {
+    border-color: rgba(159, 255, 215, 0.92);
+    box-shadow:
+      inset 0 0 0 1px rgba(159, 255, 215, 0.54),
+      inset 0 0 16px rgba(95, 214, 178, 0.24),
+      0 0 15px rgba(95, 214, 178, 0.22);
+    filter: brightness(1.08) saturate(1.2);
+  }
+  24%,
+  53% {
+    filter: brightness(0.82) saturate(0.95);
+  }
+}
+
+@keyframes currentSlotDeepNvFrame {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+  17%,
+  69% {
+    opacity: 0.94;
+  }
+  24%,
+  53% {
+    opacity: 0.46;
+  }
+}
+
+/* Final trigger-chain layout: TRG pair, RF pair, A2 dark-red safety column. */
+.trigger-grid {
+  grid-template-columns: 82px 82px 58px;
+  grid-template-rows: repeat(2, 40px);
+  grid-auto-flow: unset;
+  justify-content: center;
+  align-items: stretch;
+  gap: 7px;
+}
+
+.trigger-grid .slot {
+  width: 100%;
+  min-height: 40px;
+}
+
+.trigger-trg1 {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.trigger-trg2 {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.trigger-rf-pull {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.trigger-rf-push {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.trigger-a2 {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  align-self: stretch;
+  width: 58px;
+  min-height: 100%;
+  border-color: rgba(116, 40, 38, 0.9);
+  color: #c98576;
+  background:
+    linear-gradient(180deg, rgba(88, 20, 20, 0.5), rgba(16, 4, 5, 0.96)),
+    #0b0304;
+  box-shadow:
+    inset 0 0 0 1px rgba(116, 40, 38, 0.32),
+    inset 0 -10px 18px rgba(0, 0, 0, 0.22);
+}
+
+.trigger-a2 .slot-label {
+  color: #d79a8b;
+  font-size: 12px;
+}
+
+.trigger-a2 .occupancy span.on {
+  background: #a65045;
+}
+
+.trigger-a2.current {
+  border-color: #5fd6b2;
+  color: #9fffd7;
+}
+
+/* Final selected-card depth: darker cockpit panel, signal retained in frame only. */
+.binding-card.selected {
+  border-color: rgba(243, 154, 47, 0.88);
+  border-left-color: var(--amber);
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.18) 0 10px, rgba(243, 154, 47, 0.028) 10px 118px, transparent 260px),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(102, 212, 126, 0.018) 3px 4px),
+    rgba(0, 3, 2, 0.995);
+  box-shadow:
+    inset 0 0 0 1px rgba(243, 154, 47, 0.2),
+    inset 4px 0 0 rgba(243, 154, 47, 0.82),
+    inset 0 -18px 40px rgba(0, 0, 0, 0.42);
+}
+
+.binding-card.locked-card.selected {
+  border-color: rgba(243, 154, 47, 0.9);
+  border-left-color: var(--amber);
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.2) 0 10px, rgba(243, 154, 47, 0.035) 10px 126px, transparent 270px),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(102, 212, 126, 0.016) 3px 4px),
+    rgba(2, 4, 2, 0.995);
+  box-shadow:
+    inset 0 0 0 1px rgba(243, 154, 47, 0.28),
+    inset 4px 0 0 var(--amber),
+    inset 0 -18px 40px rgba(0, 0, 0, 0.44);
+}
+
+/* Final hover/lock semantics: no hover glyphs, lock changes frame/fill only. */
+.stick-panel .slot {
+  transition: border-color 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
+
+.stick-panel .slot:hover:not(.current) {
+  border-color: rgba(214, 182, 108, 0.62);
+  box-shadow:
+    inset 0 0 0 999px rgba(214, 182, 108, 0.055),
+    0 0 0 1px rgba(214, 182, 108, 0.12);
+  filter: brightness(1.05);
+}
+
+.stick-panel .slot.occupied:hover:not(.current) {
+  box-shadow:
+    inset 0 0 0 999px rgba(102, 212, 126, 0.05),
+    0 0 0 1px rgba(102, 212, 126, 0.12);
+}
+
+.stick-panel .slot.conflict:hover:not(.current) {
+  box-shadow:
+    inset 0 0 0 999px rgba(255, 93, 77, 0.05),
+    0 0 0 1px rgba(255, 93, 77, 0.14);
+}
+
+.stick-panel .code-edit {
+  color: transparent;
+  font-size: 0;
+  opacity: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.stick-panel .slot:hover .code-edit,
+.stick-panel .code-edit:focus-visible {
+  opacity: 1;
+  background: rgba(214, 182, 108, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(214, 182, 108, 0.24);
+}
+
+.stick-panel .slot.locked {
+  border-color: rgba(214, 182, 108, 0.72);
+  color: var(--text);
+  background:
+    repeating-linear-gradient(-45deg, rgba(214, 182, 108, 0.075), rgba(214, 182, 108, 0.075) 3px, transparent 3px, transparent 8px),
+    linear-gradient(180deg, rgba(214, 182, 108, 0.04), transparent 58%),
+    rgba(2, 9, 5, 0.86);
+}
+
+.stick-panel .slot.axis.locked {
+  border-style: dashed;
+  background:
+    repeating-linear-gradient(-45deg, rgba(214, 182, 108, 0.065), rgba(214, 182, 108, 0.065) 3px, transparent 3px, transparent 8px),
+    radial-gradient(circle at 50% 50%, rgba(145, 178, 138, 0.18), transparent 34%),
+    linear-gradient(90deg, transparent 47%, rgba(145, 178, 138, 0.28) 48% 52%, transparent 53%),
+    linear-gradient(0deg, transparent 47%, rgba(145, 178, 138, 0.28) 48% 52%, transparent 53%),
+    #031006;
+}
+
+.stick-panel .slot.occupied.locked {
+  color: var(--green);
+}
+
+.stick-panel .slot.conflict.locked {
+  color: var(--red);
+}
+
+.stick-panel .slot.uncalibrated.locked {
+  color: var(--muted);
+}
+
+.stick-panel .slot.current.locked {
+  border-color: #5fd6b2;
+  color: #9fffd7;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(95, 214, 178, 0.13), transparent 45%),
+    linear-gradient(180deg, rgba(14, 55, 44, 0.34), rgba(2, 13, 8, 0.92)),
+    #020905;
+}
+
+.stick-panel .occupancy span.locked {
+  background: var(--green);
+}
+
+/* Final topbar edge: remove the lower divider line. */
+.topbar {
+  border-bottom: 0;
+  box-shadow: none;
+}
+
+/* Final toast feedback: non-blocking cockpit notices, auto-dismissed by JS. */
+.toast-host {
+  position: fixed;
+  top: 56px;
+  right: 10px;
+  z-index: 200;
+  display: grid;
+  gap: 6px;
+  width: min(320px, calc(100vw - 20px));
+  pointer-events: none;
+}
+
+.toast {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 7px 8px;
+  border: 1px solid rgba(214, 182, 108, 0.54);
+  border-left: 3px solid var(--line-hot);
+  color: var(--text);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(102, 212, 126, 0.028) 3px 4px),
+    rgba(1, 8, 4, 0.98);
+  box-shadow:
+    inset 0 0 0 1px rgba(214, 182, 108, 0.12),
+    0 10px 24px rgba(0, 0, 0, 0.34);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: auto;
+  transform: translateY(-6px);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast.hide {
+  opacity: 0;
+  transform: translateY(-5px);
+}
+
+.toast.warn {
+  border-left-color: var(--amber);
+}
+
+.toast.error {
+  border-left-color: var(--red);
+}
+
+.toast-message {
+  min-width: 0;
+}
+
+.toast-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.toast-action {
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid rgba(214, 182, 108, 0.46);
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.28);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.toast-action:hover {
+  border-color: var(--line-hot);
+  background: rgba(214, 182, 108, 0.1);
+}
+
+.toast-action.primary {
+  border-color: var(--amber);
+  color: #140c03;
+  background: var(--amber);
+}
+
+/* Final toast prominence pass: center-top alert band with stronger entry signal. */
+.toast-host {
+  top: 58px;
+  left: 50%;
+  right: auto;
+  width: min(520px, calc(100vw - 24px));
+  transform: translateX(-50%);
+}
+
+.toast {
+  position: relative;
+  min-height: 42px;
+  padding: 9px 10px 9px 14px;
+  border-color: rgba(243, 154, 47, 0.76);
+  border-left-width: 0;
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.16) 0 9px, rgba(243, 154, 47, 0.045) 9px 112px, transparent 260px),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(102, 212, 126, 0.04) 3px 4px),
+    rgba(0, 5, 3, 0.99);
+  box-shadow:
+    inset 0 0 0 1px rgba(243, 154, 47, 0.24),
+    inset 4px 0 0 var(--amber),
+    0 0 0 1px rgba(243, 154, 47, 0.12),
+    0 12px 30px rgba(0, 0, 0, 0.42);
+  font-size: 12px;
+  transform: translateY(-12px) scale(0.985);
+  transition: opacity 120ms ease, transform 160ms ease, filter 160ms ease;
+}
+
+.toast::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--amber);
+  box-shadow:
+    0 0 7px rgba(243, 154, 47, 0.72),
+    0 0 14px rgba(102, 212, 126, 0.24);
+  animation: toastSignalPulse 1.4s steps(2, end) infinite;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: brightness(1.05);
+}
+
+.toast.hide {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.99);
+}
+
+.toast.warn {
+  border-color: rgba(243, 154, 47, 0.84);
+}
+
+.toast.error {
+  border-color: rgba(255, 93, 77, 0.8);
+  background:
+    linear-gradient(90deg, rgba(255, 93, 77, 0.16) 0 9px, rgba(255, 93, 77, 0.045) 9px 112px, transparent 260px),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(102, 212, 126, 0.035) 3px 4px),
+    rgba(6, 2, 2, 0.99);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 93, 77, 0.24),
+    inset 4px 0 0 var(--red),
+    0 0 0 1px rgba(255, 93, 77, 0.12),
+    0 12px 30px rgba(0, 0, 0, 0.42);
+}
+
+.toast.error::before {
+  background: var(--red);
+  box-shadow:
+    0 0 7px rgba(255, 93, 77, 0.78),
+    0 0 14px rgba(255, 93, 77, 0.22);
+}
+
+@keyframes toastSignalPulse {
+  0%,
+  100% {
+    opacity: 0.68;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Final card-lock language: lock is a whole-card substrate, not a control-status color. */
+.binding-card.locked-card {
+  border-color: rgba(214, 182, 108, 0.82);
+  border-left-color: var(--amber);
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.2) 0 8px, rgba(243, 154, 47, 0.055) 8px 170px, transparent 380px),
+    repeating-linear-gradient(-45deg, rgba(214, 182, 108, 0.07) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(102, 212, 126, 0.018) 3px 4px),
+    rgba(12, 10, 4, 0.985);
+  box-shadow:
+    inset 0 0 0 1px rgba(214, 182, 108, 0.24),
+    inset 4px 0 0 rgba(243, 154, 47, 0.72),
+    inset 0 -20px 42px rgba(0, 0, 0, 0.34);
+}
+
+.binding-card.locked-card.selected {
+  border-color: rgba(243, 154, 47, 0.92);
+  border-left-color: var(--amber);
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.24) 0 8px, rgba(243, 154, 47, 0.062) 8px 180px, transparent 400px),
+    repeating-linear-gradient(-45deg, rgba(214, 182, 108, 0.08) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(102, 212, 126, 0.016) 3px 4px),
+    rgba(9, 8, 3, 0.995);
+  box-shadow:
+    inset 0 0 0 1px rgba(243, 154, 47, 0.34),
+    inset 4px 0 0 var(--amber),
+    inset 0 -22px 46px rgba(0, 0, 0, 0.42);
+}
+
+/* Final lock substrate color pass: carry the border hue into the card body. */
+.binding-card.locked-card {
+  border-color: rgba(214, 182, 108, 0.9);
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.23) 0 8px, rgba(214, 182, 108, 0.105) 8px 46%, rgba(145, 178, 138, 0.045) 46% 78%, transparent 100%),
+    repeating-linear-gradient(-45deg, rgba(214, 182, 108, 0.085) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(102, 212, 126, 0.018) 3px 4px),
+    rgba(16, 14, 5, 0.985);
+  box-shadow:
+    inset 0 0 0 1px rgba(214, 182, 108, 0.3),
+    inset 4px 0 0 rgba(243, 154, 47, 0.82),
+    inset 0 -20px 42px rgba(0, 0, 0, 0.3);
+}
+
+.binding-card.locked-card.selected {
+  border-color: rgba(243, 154, 47, 0.96);
+  background:
+    linear-gradient(90deg, rgba(243, 154, 47, 0.28) 0 8px, rgba(214, 182, 108, 0.13) 8px 48%, rgba(145, 178, 138, 0.052) 48% 80%, transparent 100%),
+    repeating-linear-gradient(-45deg, rgba(214, 182, 108, 0.1) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(102, 212, 126, 0.016) 3px 4px),
+    rgba(13, 11, 4, 0.995);
+  box-shadow:
+    inset 0 0 0 1px rgba(243, 154, 47, 0.38),
+    inset 4px 0 0 var(--amber),
+    inset 0 -22px 46px rgba(0, 0, 0, 0.36);
+}
+
+/* Final binding operation pass: every card exposes lock and unbind controls. */
+.binding-controls,
+.binding-console.has-conflict .binding-controls {
+  grid-template-columns: auto auto minmax(82px, 1fr) 32px 34px;
+}
+
+.seg button,
+.slot-pill,
+.card-clear,
+.card-lock {
+  min-height: 30px;
+  border: 1px solid rgba(214, 182, 108, 0.36);
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(214, 182, 108, 0.08), transparent 55%),
+    #030704;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.card-clear,
+.card-lock {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+}
+
+.card-clear {
+  color: var(--muted);
+}
+
+.card-clear:hover:not(:disabled) {
+  border-color: rgba(255, 93, 77, 0.72);
+  color: var(--red);
+  box-shadow: 0 0 0 1px rgba(255, 93, 77, 0.12), 0 0 14px rgba(255, 93, 77, 0.16);
+}
+
+.card-clear:disabled {
+  cursor: default;
+  color: rgba(125, 144, 114, 0.34);
+  border-color: rgba(89, 111, 71, 0.22);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.clear-icon {
+  display: block;
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.binding-console.has-conflict .card-clear,
+.binding-console.has-conflict .card-lock {
+  min-width: 32px;
+}
+
+@media (max-width: 700px) {
+  html,
+  body {
+    height: auto;
+    min-width: 0;
+    overflow: auto;
+  }
+
+  .app-shell {
+    min-height: 100vh;
+    height: auto;
+    overflow: visible;
+  }
+
+  .topbar {
+    height: auto;
+    min-height: 48px;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+    padding: 8px;
+  }
+
+  .brand,
+  .top-legend,
+  .top-actions {
+    min-width: 0;
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .brand {
+    align-items: flex-start;
+  }
+
+  .brand h1,
+  .brand p {
+    overflow-wrap: anywhere;
+  }
+
+  .top-legend,
+  .top-actions,
+  .filters,
+  .tabs {
+    flex-wrap: wrap;
+  }
+
+  .search-box {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .profile-controls {
+    flex: 1 1 100%;
+  }
+
+  .profile-select {
+    flex: 1 1 0;
+    width: auto;
+    max-width: none;
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    overflow: visible;
+    padding: 6px;
+  }
+
+  .list-zone {
+    order: -1;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .list-controls {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .card-wrap,
+  .stick-panel {
+    overflow: visible;
+  }
+
+  .binding-card,
+  .binding-card.has-conflict {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "action"
+      "desc"
+      "meta";
+  }
+
+  .binding-console,
+  .binding-console.has-conflict {
+    grid-template-columns: 10px minmax(0, 1fr);
+  }
+
+  .binding-console.has-conflict .conflict-mini-card {
+    grid-column: 2;
+    grid-row: auto;
+  }
+
+  .binding-console.has-conflict .binding-controls {
+    grid-column: 2;
+    grid-row: auto;
+  }
+
+  .binding-controls,
+  .binding-console.has-conflict .binding-controls {
+    grid-template-columns: auto auto minmax(0, 1fr) 32px 32px;
+  }
+
+  .seg button,
+  .binding-console.has-conflict .seg button {
+    min-width: 24px;
+    padding: 0 4px;
+  }
+
+  .layer-seg button,
+  .binding-console.has-conflict .layer-seg button {
+    min-width: 30px;
+  }
+
+  .slot-pill {
+    padding: 0 6px;
+  }
+
+  .card-clear,
+  .card-lock {
+    width: 32px;
+    min-width: 32px;
+  }
+}
+
+/* Final conflict undo and cockpit icon pass. */
+.toast.countdown {
+  padding-bottom: 16px;
+}
+
+.toast-countdown {
+  display: inline-block;
+  min-width: 22px;
+  margin-left: 8px;
+  color: var(--amber);
+  font-weight: 900;
+  text-align: right;
+  text-shadow: 0 0 9px rgba(243, 154, 47, 0.42);
+}
+
+.toast-progress {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 7px;
+  height: 2px;
+  overflow: hidden;
+  background: rgba(214, 182, 108, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+}
+
+.toast-progress::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--amber), rgba(102, 212, 126, 0.78));
+  transform-origin: left center;
+  animation: toastCountdown var(--toast-duration) linear forwards;
+}
+
+@keyframes toastCountdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* Final C text-signal controls. */
+.clear-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: auto;
+  min-width: 24px;
+  height: 16px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: currentColor;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.clear-icon::before,
+.clear-icon::after {
+  content: none;
+}
+
+.clear-icon::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: -2px;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.82;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Final lock control reset: use pure text, never the historical lock glyph layers. */
+.lock-text {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 16px;
+  color: currentColor;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  text-shadow: 0 0 7px rgba(229, 236, 212, 0.16);
+}
+
+.lock-text::before,
+.lock-text::after {
+  content: none;
+}
+
+.card-lock.active .lock-text,
+#lockBtn.active .lock-text {
+  color: var(--amber);
+  text-shadow: 0 0 8px rgba(243, 154, 47, 0.46);
+}
+
+.card-lock:active:not(:disabled) .lock-text,
+#lockBtn:active:not(:disabled) .lock-text {
+  color: var(--paper);
+}
+
+.card-lock:disabled .lock-text,
+#lockBtn:disabled .lock-text {
+  opacity: 0.42;
+}
+
+.card-clear:hover:not(:disabled) .clear-icon {
+  color: var(--amber);
+  text-shadow: 0 0 8px rgba(243, 154, 47, 0.42);
+}
+
+.card-clear:disabled .clear-icon {
+  opacity: 0.42;
+}
+
+/* Final HUD help and retro tooltip layer. */
+body.help-open {
+  overflow: hidden;
+}
+
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: none;
+  color: var(--paper);
+  background:
+    linear-gradient(rgba(61, 96, 58, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61, 96, 58, 0.08) 1px, transparent 1px),
+    rgba(0, 5, 3, 0.78);
+  background-size: 18px 18px, 18px 18px, auto;
+}
+
+.help-overlay.open {
+  display: block;
+}
+
+.help-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(24, 57, 35, 0.16), transparent 46%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 4px);
+  background-size: auto, 100% 4px;
+  box-shadow: inset 0 0 0 1px rgba(214, 182, 108, 0.2), inset 0 0 80px rgba(0, 0, 0, 0.74);
+  pointer-events: auto;
+}
+
+.help-board {
+  position: fixed;
+  top: 74px;
+  right: 20px;
+  bottom: 20px;
+  z-index: 9003;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(430px, calc(100vw - 40px));
+  border: 1px solid rgba(214, 182, 108, 0.72);
+  background:
+    linear-gradient(180deg, rgba(243, 154, 47, 0.08), transparent 100px),
+    rgba(3, 12, 8, 0.94);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.9),
+    0 0 34px rgba(0, 0, 0, 0.48),
+    inset 0 0 28px rgba(102, 212, 126, 0.05);
+  pointer-events: auto;
+}
+
+.help-board header,
+.help-board footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(214, 182, 108, 0.34);
+}
+
+.help-board footer {
+  border-top: 1px solid rgba(214, 182, 108, 0.34);
+  border-bottom: 0;
+  color: rgba(205, 220, 190, 0.7);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.help-board header span {
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.help-board h2 {
+  margin: 0;
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 20px;
+  letter-spacing: 0;
+}
+
+.help-items {
+  display: grid;
+  gap: 8px;
+  overflow: auto;
+  padding: 12px 14px;
+}
+
+.help-item {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  padding: 8px 0 9px;
+  border-bottom: 1px solid rgba(214, 182, 108, 0.18);
+}
+
+.help-item:last-child {
+  border-bottom: 0;
+}
+
+.help-item-index {
+  display: grid;
+  place-items: center;
+  height: 26px;
+  border: 1px solid rgba(243, 154, 47, 0.76);
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: inset 0 0 12px rgba(243, 154, 47, 0.08);
+}
+
+.help-item-copy h3 {
+  margin: 0 0 4px;
+  color: var(--paper);
+  font-size: 15px;
+}
+
+.help-item-copy p {
+  margin: 0;
+  color: rgba(205, 220, 190, 0.74);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.help-board button {
+  min-width: 72px;
+  min-height: 34px;
+  border: 1px solid rgba(214, 182, 108, 0.76);
+  background: rgba(7, 12, 7, 0.88);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.help-board button:hover,
+.help-board button:focus-visible {
+  border-color: var(--amber);
+  color: var(--amber);
+  outline: 0;
+  box-shadow: 0 0 0 1px rgba(243, 154, 47, 0.28), inset 0 0 14px rgba(243, 154, 47, 0.08);
+}
+
+.hud-tooltip {
+  position: fixed;
+  z-index: 9500;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 7px 10px;
+  border: 1px solid rgba(214, 182, 108, 0.68);
+  background: rgba(2, 9, 6, 0.97);
+  color: rgba(229, 236, 212, 0.92);
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(3px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.86), 0 0 18px rgba(0, 0, 0, 0.38);
+}
+
+.hud-tooltip.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 1120px) {
+  .help-board {
+    top: auto;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+    max-height: min(54vh, 520px);
+  }
+}
+
+/* Final direct help panel: no page map, just button examples and short notes. */
+body.help-open {
+  overflow: auto;
+}
+
+.help-overlay {
+  background: transparent;
+  pointer-events: auto;
+}
+
+.help-vignette {
+  background: transparent;
+  box-shadow: none;
+  pointer-events: auto;
+}
+
+.help-board {
+  top: 62px;
+  right: 14px;
+  bottom: auto;
+  width: min(760px, calc(100vw - 28px));
+  max-height: min(76vh, 680px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background:
+    linear-gradient(180deg, rgba(243, 154, 47, 0.08), transparent 84px),
+    rgba(3, 12, 8, 0.98);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.9),
+    0 18px 42px rgba(0, 0, 0, 0.58),
+    inset 0 0 24px rgba(102, 212, 126, 0.05);
+}
+
+.help-board header,
+.help-board footer {
+  padding: 10px 12px;
+}
+
+.help-board h2 {
+  font-size: 18px;
+}
+
+.help-items {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 10px;
+  padding: 12px;
+}
+
+.help-item {
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 9px;
+  min-height: 116px;
+  padding: 10px;
+  border: 1px solid rgba(214, 182, 108, 0.24);
+  background: rgba(0, 12, 7, 0.58);
+}
+
+.help-item-index {
+  height: 24px;
+  font-size: 11px;
+}
+
+.help-sample {
+  display: inline-grid;
+  place-items: center;
+  min-width: 42px;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid rgba(214, 182, 108, 0.72);
+  background:
+    linear-gradient(180deg, rgba(214, 182, 108, 0.08), transparent),
+    rgba(5, 14, 8, 0.84);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: inset 0 0 12px rgba(102, 212, 126, 0.04);
+}
+
+.help-control-row:first-child .help-sample {
+  border-color: rgba(243, 154, 47, 0.78);
+  color: var(--amber);
+}
+
+.help-control-list {
+  display: grid;
+  gap: 6px;
+}
+
+.help-control-row {
+  display: grid;
+  grid-template-columns: minmax(76px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.help-control-note {
+  color: rgba(205, 220, 190, 0.74);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.help-item-copy h3 {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.help-item-copy p {
+  font-size: 12px;
+  line-height: 1.42;
+}
+
+@media (max-width: 760px) {
+  .help-board {
+    top: 54px;
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-height: calc(100vh - 72px);
+  }
+
+  .help-items {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Final help layout correction: one real button per row, no grouped overflow. */
+.help-board {
+  width: min(860px, calc(100vw - 28px));
+}
+
+.help-items {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.help-item {
+  grid-template-columns: 28px minmax(0, 1fr);
+  min-height: 0;
+  padding: 8px;
+}
+
+.help-item-copy h3 {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: rgba(205, 220, 190, 0.84);
+}
+
+.help-control-row {
+  grid-template-columns: minmax(74px, max-content) minmax(0, 1fr);
+  gap: 7px;
+  align-items: start;
+}
+
+.help-sample {
+  min-width: 0;
+  min-height: 24px;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.help-control-note {
+  padding-top: 2px;
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .help-items {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .help-items {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .help-control-row {
+    grid-template-columns: minmax(86px, max-content) minmax(0, 1fr);
+  }
+}
+
+/* Final lock text safety: REL/LCK/CLR must stay readable in pressed and locked states. */
+.card-lock,
+#lockBtn,
+.card-clear,
+#clearBtn {
+  position: relative;
+  color: var(--text);
+}
+
+.card-lock.active,
+#lockBtn.active {
+  border-color: rgba(243, 154, 47, 0.86);
+  color: var(--amber);
+  background:
+    linear-gradient(180deg, rgba(243, 154, 47, 0.13), transparent 55%),
+    #030704;
+  box-shadow: inset 0 0 12px rgba(243, 154, 47, 0.08);
+}
+
+.card-lock:active:not(:disabled),
+#lockBtn:active:not(:disabled),
+.card-clear:active:not(:disabled),
+#clearBtn:active:not(:disabled) {
+  color: var(--paper);
+  background:
+    linear-gradient(180deg, rgba(102, 212, 126, 0.12), transparent 55%),
+    #030704;
+}
+
+.clear-icon {
+  z-index: 1;
+  color: currentColor;
+  text-shadow: 0 0 7px rgba(229, 236, 212, 0.16);
+}
+
+/* Branch preview: merge A1 mini axis with 6DOF axis, and pack HATS two-up. */
+.stick-head,
+.group-trigger,
+.group-axis,
+.group-hats,
+.group-base {
+  grid-column: 1 / -1;
+}
+
+.group-axis {
+  --group-accent: #91b28a;
+}
+
+.axis-deck {
+  display: grid;
+  gap: 6px;
+}
+
+.axis-band {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid rgba(145, 178, 138, 0.22);
+  background:
+    linear-gradient(90deg, rgba(145, 178, 138, 0.08), transparent 38%),
+    rgba(0, 0, 0, 0.1);
+}
+
+.axis-band-title {
+  width: max-content;
+  padding: 0 5px;
+  border: 1px solid rgba(145, 178, 138, 0.38);
+  color: rgba(205, 220, 190, 0.78);
+  background: rgba(1, 7, 4, 0.5);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.group-axis .axis-row-a1 .axis-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  justify-content: stretch;
+  gap: 6px;
+}
+
+.group-axis .axis-row-6dof .axis-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-content: stretch;
+  gap: 6px;
+}
+
+.group-axis .slot.axis {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+}
+
+.group-hats .hat-strips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(122px, 1fr));
+  justify-content: center;
+  gap: 7px;
+}
+
+.group-hats .hat-strip {
+  min-height: 132px;
+  padding: 16px 4px 5px;
+}
+
+.group-hats .hat-strip-title {
+  top: 4px;
+  left: 4px;
+  padding: 0 4px;
+  background: rgba(2, 10, 5, 0.9);
+  font-size: 9px;
+}
+
+.group-hats .hat-strip-grid {
+  position: relative;
+  grid-template-columns: repeat(3, 38px);
+  grid-template-rows: repeat(3, 38px);
+  justify-content: center;
+  gap: 4px;
+}
+
+.group-hats .hat-chip {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+}
+
+.hat-strip-a1 .hat-strip-grid::before {
+  content: "";
+  grid-column: 2;
+  grid-row: 2;
+  align-self: center;
+  justify-self: center;
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(145, 178, 138, 0.38);
+  background:
+    linear-gradient(90deg, transparent 40%, rgba(145, 178, 138, 0.4) 41% 59%, transparent 60%),
+    linear-gradient(0deg, transparent 40%, rgba(145, 178, 138, 0.4) 41% 59%, transparent 60%);
+  opacity: 0.78;
+}
+
+@media (max-width: 1280px) {
+  .workspace {
+    grid-template-columns: minmax(258px, 0.82fr) minmax(0, 1.9fr) minmax(258px, 0.82fr);
+  }
+
+  .stick-head {
+    padding-right: 3px;
+    padding-left: 3px;
+  }
+
+  .layer-switch {
+    grid-template-columns: repeat(3, 76px);
+    gap: 5px;
+  }
+
+  .layer-switch button {
+    width: 76px;
+  }
+
+  .group-hats {
+    padding-right: 3px;
+    padding-left: 3px;
+  }
+
+  .group-hats .hat-strips {
+    grid-template-columns: repeat(2, 122px);
+    gap: 2px;
+  }
+
+  .group-hats .hat-strip {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .group-base .base-lower-row {
+    grid-template-columns: 74px 88px 74px;
+    gap: 3px;
+  }
+
+  .group-base .base-function-row {
+    grid-template-columns: repeat(3, 74px);
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .group-base .base-panel-board,
+  .group-base .base-function-row,
+  .group-base .base-lower-row {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
