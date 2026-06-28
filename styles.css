@@ -5372,3 +5372,187 @@ body.help-open {
     max-width: 100%;
   }
 }
+
+/* Final card button fit: compact controls, full key text inside the existing row. */
+.binding-controls,
+.binding-console.has-conflict .binding-controls {
+  grid-template-columns: auto auto minmax(112px, 176px) 34px;
+  grid-template-rows: repeat(2, minmax(15px, 1fr));
+  column-gap: 4px;
+  row-gap: 3px;
+  justify-content: end;
+  align-items: stretch;
+}
+
+.binding-controls .seg {
+  gap: 1px;
+  padding: 1px;
+}
+
+.binding-controls .seg button,
+.binding-console.has-conflict .seg button {
+  min-width: 26px;
+  padding: 0 4px;
+}
+
+.binding-card .layer-seg button,
+.binding-console.has-conflict .layer-seg button {
+  min-width: 40px;
+  padding: 0 5px;
+  font-size: 11px;
+}
+
+.card-clear,
+.card-lock,
+.binding-console.has-conflict .card-clear,
+.binding-console.has-conflict .card-lock {
+  box-sizing: border-box;
+  width: 34px;
+  min-width: 34px;
+  max-width: 34px;
+  min-height: 0;
+  height: 100%;
+}
+
+.binding-controls > .seg,
+.binding-console.has-conflict .binding-controls > .seg,
+.binding-controls > .slot-pill,
+.binding-console.has-conflict .binding-controls > .slot-pill {
+  grid-row: 1 / span 2;
+}
+
+.binding-controls > .card-clear,
+.binding-console.has-conflict .binding-controls > .card-clear {
+  grid-column: 4;
+  grid-row: 1;
+}
+
+.binding-controls > .card-lock,
+.binding-console.has-conflict .binding-controls > .card-lock {
+  grid-column: 4;
+  grid-row: 2;
+}
+
+.slot-pill {
+  grid-template-columns: 7px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  row-gap: 0;
+  align-content: center;
+  min-width: 112px;
+  min-height: 33px;
+  padding: 2px 6px;
+}
+
+.status-dot-ui {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.slot-pill-label,
+.slot-pill-code {
+  grid-column: 2;
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.slot-pill-label {
+  align-self: end;
+  font-size: 10px;
+  line-height: 1.05;
+}
+
+.slot-pill-code {
+  align-self: start;
+  justify-self: start;
+  color: var(--line-hot);
+  font-size: 8px;
+  line-height: 1.05;
+  opacity: 0.9;
+}
+
+.clear-icon,
+.lock-text {
+  max-width: 100%;
+  min-width: 0;
+  height: auto;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.clear-icon::after {
+  content: none;
+}
+
+/* Final balance pass: status is a signal rail, while real controls get the space. */
+.binding-console {
+  grid-template-columns: 4px minmax(0, 1fr);
+  gap: 6px;
+  padding: 6px 7px 6px 5px;
+}
+
+.binding-console.has-conflict {
+  grid-template-columns: 4px minmax(96px, 112px) minmax(0, 1fr);
+}
+
+.status-rail {
+  width: 4px;
+  min-height: 100%;
+  border: 0;
+  cursor: default;
+  background:
+    repeating-linear-gradient(180deg, rgba(205, 220, 190, 0.18) 0 3px, transparent 3px 5px),
+    rgba(125, 144, 114, 0.32);
+}
+
+.status-rail.green {
+  background:
+    repeating-linear-gradient(180deg, rgba(210, 255, 220, 0.24) 0 3px, transparent 3px 5px),
+    linear-gradient(180deg, rgba(102, 212, 126, 0.95), rgba(102, 212, 126, 0.22));
+  box-shadow: 0 0 8px rgba(102, 212, 126, 0.28);
+}
+
+.status-rail.amber {
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 220, 156, 0.24) 0 3px, transparent 3px 5px),
+    linear-gradient(180deg, rgba(243, 154, 47, 0.95), rgba(243, 154, 47, 0.22));
+}
+
+.status-rail.red {
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 190, 180, 0.24) 0 3px, transparent 3px 5px),
+    linear-gradient(180deg, rgba(255, 93, 77, 0.95), rgba(255, 93, 77, 0.22));
+}
+
+.status-rail.noted::after {
+  width: 3px;
+  height: 3px;
+  margin-top: 4px;
+}
+
+.binding-controls,
+.binding-console.has-conflict .binding-controls {
+  grid-template-columns: auto auto minmax(112px, 148px) 34px;
+  column-gap: 5px;
+}
+
+.binding-controls .hand-seg button,
+.binding-console.has-conflict .hand-seg button {
+  min-width: 31px;
+}
+
+.binding-card .layer-seg button,
+.binding-console.has-conflict .layer-seg button {
+  min-width: 44px;
+}
+
+.slot-pill {
+  min-width: 112px;
+  max-width: 148px;
+}
