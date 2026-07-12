@@ -12,6 +12,13 @@ const chromeBin = process.env.CHROME_BIN || "/Applications/Google Chrome.app/Con
 const workspaceKey = "sc-dual-vkb-binding-planner:v1";
 const syncConfigKey = "sc-dual-vkb-binding-planner:sync";
 const syncTokenKey = "sc-dual-vkb-binding-planner:sync-token";
+const responsiveViewports = [
+  { name: "phone", width: 390, height: 844, touch: true },
+  { name: "ipad-portrait", width: 1024, height: 1366, touch: true },
+  { name: "ipad-landscape", width: 1366, height: 1024, touch: true },
+  { name: "2k", width: 2560, height: 1440, touch: false },
+  { name: "4k", width: 3840, height: 2160, touch: false },
+];
 
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
@@ -564,6 +571,132 @@ async function evaluate(cdp, expression, options = {}) {
   return result.result?.value;
 }
 
+function appReadyExpression() {
+  return `
+    new Promise((resolve, reject) => {
+      const started = Date.now();
+      const timer = setInterval(() => {
+        if (document.readyState === "complete" && document.querySelector("#syncBtn") && document.querySelectorAll(".binding-card").length) {
+          clearInterval(timer);
+          resolve(true);
+        } else if (Date.now() - started > 10000) {
+          clearInterval(timer);
+          reject(new Error("App did not finish loading for smoke"));
+        }
+      }, 50);
+    })
+  `;
+}
+
+function responsiveGeometryExpression() {
+  return `
+    (() => {
+      const rect = (selector) => {
+        const element = document.querySelector(selector);
+        if (!element) throw new Error("Missing responsive selector " + selector);
+        const value = element.getBoundingClientRect();
+        return { top: value.top, left: value.left, right: value.right, bottom: value.bottom, width: value.width, height: value.height };
+      };
+      const cards = Array.from(document.querySelectorAll(".binding-card"));
+      const relationshipCards = Array.from(document.querySelectorAll(".conflict-mini-card"));
+      const touchControls = Array.from(document.querySelectorAll(
+        ".activation-mode-select, .context-picker-button, [data-filter], .tab-button, .conflict-mini-action",
+      )).filter((element) => element.getClientRects().length > 0);
+      return {
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        documentWidth: document.documentElement.scrollWidth,
+        bodyWidth: document.body.scrollWidth,
+        workspace: rect(".workspace"),
+        list: rect(".list-zone"),
+        listControls: rect(".list-controls"),
+        leftPanel: rect("#leftPanel"),
+        rightPanel: rect("#rightPanel"),
+        overflowCards: cards
+          .filter((element) => element.scrollWidth > element.clientWidth + 1)
+          .map((element) => element.dataset.rowId),
+        overflowRelationshipCards: relationshipCards
+          .filter((element) => element.scrollWidth > element.clientWidth + 1)
+          .map((element) => element.closest(".binding-card")?.dataset.rowId || "unknown"),
+        minTouchControlHeight: touchControls.length
+          ? Math.min(...touchControls.map((element) => element.getBoundingClientRect().height))
+          : 0,
+      };
+    })()
+  `;
+}
+
+function assertResponsiveGeometry(viewport, result) {
+  const tolerance = 1;
+  if (result.documentWidth > viewport.width + tolerance || result.bodyWidth > viewport.width + tolerance) {
+    throw new Error(`${viewport.name} horizontal overflow: document=${result.documentWidth}, body=${result.bodyWidth}, viewport=${viewport.width}`);
+  }
+  if (result.overflowCards.length || result.overflowRelationshipCards.length) {
+    throw new Error(`${viewport.name} card overflow: ${JSON.stringify({
+      cards: result.overflowCards,
+      relationships: result.overflowRelationshipCards,
+    })}`);
+  }
+  if (result.listControls.left < result.list.left - tolerance || result.listControls.right > result.list.right + tolerance) {
+    throw new Error(`${viewport.name} list controls escape list zone: ${JSON.stringify({
+      list: result.list,
+      listControls: result.listControls,
+    })}`);
+  }
+  if (viewport.touch && result.minTouchControlHeight < 36) {
+    throw new Error(`${viewport.name} touch target below 36px: ${result.minTouchControlHeight}`);
+  }
+  if (viewport.name === "ipad-portrait") {
+    if (!(result.list.top + tolerance < result.leftPanel.top && result.list.top + tolerance < result.rightPanel.top)) {
+      throw new Error(`ipad-portrait must place list before both panels: ${JSON.stringify(result)}`);
+    }
+    if (Math.abs(result.leftPanel.top - result.rightPanel.top) > tolerance) {
+      throw new Error(`ipad-portrait panels must share one row: ${JSON.stringify(result)}`);
+    }
+  }
+  if (viewport.name === "ipad-landscape") {
+    if (result.leftPanel.width <= 0 || result.rightPanel.width <= 0 || result.list.width < 700) {
+      throw new Error(`ipad-landscape cockpit is not simultaneously usable: ${JSON.stringify(result)}`);
+    }
+    if (result.leftPanel.width > 330 || result.rightPanel.width > 330) {
+      throw new Error(`ipad-landscape stick rails are too wide: ${JSON.stringify(result)}`);
+    }
+  }
+  if ((viewport.name === "2k" || viewport.name === "4k") && result.workspace.width > 2400 + tolerance) {
+    throw new Error(`${viewport.name} workspace exceeds 2400px: ${result.workspace.width}`);
+  }
+}
+
+async function verifyResponsiveMatrix(cdp, url) {
+  const results = [];
+  for (const viewport of responsiveViewports) {
+    await cdp.call("Emulation.setDeviceMetricsOverride", {
+      width: viewport.width,
+      height: viewport.height,
+      screenWidth: viewport.width,
+      screenHeight: viewport.height,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await cdp.call("Emulation.setTouchEmulationEnabled", {
+      enabled: viewport.touch,
+      maxTouchPoints: viewport.touch ? 5 : 1,
+    });
+    await cdp.call("Emulation.setEmulatedMedia", {
+      media: "screen",
+      features: viewport.touch
+        ? [{ name: "pointer", value: "coarse" }, { name: "hover", value: "none" }]
+        : [],
+    });
+    await cdp.call("Page.navigate", { url });
+    await evaluate(cdp, appReadyExpression());
+    const geometry = await evaluate(cdp, responsiveGeometryExpression());
+    assertResponsiveGeometry(viewport, geometry);
+    results.push({ name: viewport.name, ...geometry });
+  }
+  return results;
+}
+
 async function main() {
   let server;
   let chrome;
@@ -588,22 +721,10 @@ async function main() {
       // Older Chrome builds may not expose this command; export is still verified by app toast.
     }
     await cdp.call("Page.navigate", { url: served.url });
-    await evaluate(cdp, `
-      new Promise((resolve, reject) => {
-        const started = Date.now();
-        const timer = setInterval(() => {
-          if (document.readyState === "complete" && document.querySelector("#syncBtn") && window.__syncSmoke) {
-            clearInterval(timer);
-            resolve(true);
-          } else if (Date.now() - started > 10000) {
-            clearInterval(timer);
-            reject(new Error("App did not finish loading for smoke"));
-          }
-        }, 50);
-      })
-    `);
+    await evaluate(cdp, appReadyExpression());
     const steps = await evaluate(cdp, pageExpression());
-    console.log(JSON.stringify({ ok: true, steps }, null, 2));
+    const responsive = await verifyResponsiveMatrix(cdp, served.url);
+    console.log(JSON.stringify({ ok: true, steps, responsive }, null, 2));
   } finally {
     if (cdp) cdp.close();
     if (chrome) {

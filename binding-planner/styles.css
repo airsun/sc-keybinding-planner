@@ -5989,3 +5989,216 @@ body.help-open {
     width: 100%;
   }
 }
+
+/* Final responsive workspace contract: iPad, Sidecar, 2K, and 4K. */
+.workspace {
+  width: min(100%, 2400px);
+  min-width: 0;
+  margin-inline: auto;
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(280px, 320px);
+}
+
+.list-zone,
+.stick-panel,
+.binding-card,
+.binding-card.has-relationship,
+.binding-console,
+.binding-console.has-relationship,
+.conflict-mini-card,
+.binding-controls {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.binding-card,
+.binding-card.has-relationship {
+  width: 100%;
+}
+
+.list-controls {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.tabs,
+.top-legend,
+.filters {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.binding-card.has-relationship {
+  grid-template-columns: minmax(160px, 1fr) minmax(0, 520px);
+}
+
+@media (min-width: 1920px) {
+  .workspace {
+    width: min(calc(100% - 32px), 2400px);
+    grid-template-columns: minmax(360px, 400px) minmax(0, 1fr) minmax(360px, 400px);
+  }
+
+  .binding-card.has-relationship {
+    grid-template-columns: minmax(220px, 1fr) minmax(0, 570px);
+  }
+}
+
+@media (max-width: 1180px) {
+  html,
+  body {
+    width: 100%;
+    min-width: 0;
+    max-width: 100vw;
+    height: auto;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .app-shell {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 100dvh;
+    grid-template-rows: auto auto;
+    overflow: visible;
+  }
+
+  .topbar {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 48px;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .brand {
+    min-width: 0;
+    width: 100%;
+    flex: 1 1 280px;
+  }
+
+  .top-actions {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 680px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .profile-controls {
+    min-width: 0;
+    flex: 1 1 280px;
+  }
+
+  .profile-select {
+    min-width: 0;
+    width: auto;
+    flex: 1 1 0;
+  }
+
+  .search-box {
+    min-width: 220px;
+    flex: 1 1 280px;
+  }
+
+  .workspace {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto auto;
+    align-items: start;
+    overflow: visible;
+  }
+
+  .list-zone {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    order: 0;
+    width: 100%;
+    height: calc(100dvh - 68px);
+    min-height: 720px;
+    max-height: calc(100dvh - 68px);
+    overflow: hidden;
+  }
+
+  #leftPanel {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  #rightPanel {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .stick-panel {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    max-height: none;
+    overflow-x: hidden;
+    overflow-y: visible;
+  }
+
+  .binding-cards,
+  .card-wrap {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .list-zone {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: calc(100dvh - 148px);
+    max-height: calc(100dvh - 68px);
+  }
+
+  #leftPanel {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  #rightPanel {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .binding-card.has-relationship {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (pointer: coarse) {
+  .activation-mode-select,
+  .context-picker-button,
+  .tab-button,
+  .filter-button,
+  .small-button,
+  .conflict-mini-action,
+  .card-clear,
+  .card-lock {
+    min-height: 36px;
+  }
+
+  .activation-mode-select,
+  .context-picker-button {
+    height: 36px;
+  }
+
+  .action-config-row {
+    width: min(100%, 400px);
+  }
+}
