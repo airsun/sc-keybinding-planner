@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SC Dual VKB Binding Planner</title>
-    <link rel="stylesheet" href="./styles.css?v=retro-79">
+    <link rel="stylesheet" href="./styles.css?v=retro-80">
   </head>
   <body>
     <div id="app" class="app-shell">
@@ -99,8 +99,31 @@
             </div>
           </div>
 
-          <div class="card-wrap">
-            <div id="bindingRows" class="binding-cards" aria-label="绑定清单"></div>
+          <div id="cardStage" class="card-stage">
+            <div id="cardWrap" class="card-wrap">
+              <div id="bindingRows" class="binding-cards" aria-label="绑定清单"></div>
+            </div>
+            <section id="cardDetailOverlay" class="card-detail-overlay" aria-label="操作详情" hidden>
+              <header class="card-detail-header">
+                <button class="card-detail-nav card-detail-back" type="button" data-detail-command="back" title="返回清单" aria-label="返回清单">
+                  <span aria-hidden="true">←</span>
+                </button>
+                <div class="card-detail-heading">
+                  <span class="card-detail-kicker">DETAIL</span>
+                  <h2 id="cardDetailTitle"></h2>
+                </div>
+                <nav class="card-detail-pager" aria-label="详情导航">
+                  <button class="card-detail-nav" type="button" data-detail-command="previous" title="上一个操作" aria-label="上一个操作">
+                    <span aria-hidden="true">‹</span>
+                  </button>
+                  <output id="cardDetailPosition" class="card-detail-position" aria-live="polite"></output>
+                  <button class="card-detail-nav" type="button" data-detail-command="next" title="下一个操作" aria-label="下一个操作">
+                    <span aria-hidden="true">›</span>
+                  </button>
+                </nav>
+              </header>
+              <div id="cardDetailBody" class="card-detail-body"></div>
+            </section>
           </div>
         </section>
 
@@ -248,6 +271,6 @@
     <script src="./data.js?v=retro-4"></script>
     <script src="./workspace-core.js?v=repair-2"></script>
     <script src="./sync-core.js?v=sync-1"></script>
-    <script src="./app.js?v=retro-40"></script>
+    <script src="./app.js?v=retro-41"></script>
   </body>
 </html>

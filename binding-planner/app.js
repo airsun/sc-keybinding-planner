@@ -19,6 +19,15 @@
     leftPanel: document.getElementById("leftPanel"),
     rightPanel: document.getElementById("rightPanel"),
     rows: document.getElementById("bindingRows"),
+    cardStage: document.getElementById("cardStage"),
+    cardWrap: document.getElementById("cardWrap"),
+    cardDetailOverlay: document.getElementById("cardDetailOverlay"),
+    cardDetailTitle: document.getElementById("cardDetailTitle"),
+    cardDetailPosition: document.getElementById("cardDetailPosition"),
+    cardDetailBody: document.getElementById("cardDetailBody"),
+    cardDetailBack: document.querySelector('[data-detail-command="back"]'),
+    cardDetailPrevious: document.querySelector('[data-detail-command="previous"]'),
+    cardDetailNext: document.querySelector('[data-detail-command="next"]'),
     search: document.getElementById("searchInput"),
     profileSelect: document.getElementById("profileSelect"),
     profileAddBtn: document.getElementById("profileAddBtn"),
@@ -125,20 +134,22 @@
     {
       title: "L/R + Base/S1/S2",
       controls: [
-        { label: "L / R", note: "切换左杆或右杆。", selector: ".binding-card.selected .hand-seg button" },
-        { label: "Base / S1 / S2", note: "切换基础层或 Shift 层。", selector: ".binding-card.selected .layer-seg button" },
+        { label: "L / R", note: "切换左杆或右杆。", selector: "#cardDetailOverlay .hand-seg button" },
+        { label: "Base / S1 / S2", note: "切换基础层或 Shift 层。", selector: "#cardDetailOverlay .layer-seg button" },
       ],
     },
     {
       title: "点选键位",
       controls: [
-        { label: "点选键位", note: "进入待分配状态，然后点左右摇杆按钮完成绑定。", selector: ".binding-card.selected .slot-pill" },
+        { label: "点选键位", note: "进入待分配状态，然后点左右摇杆按钮完成绑定。", selector: "#cardDetailOverlay .slot-pill" },
       ],
     },
   ];
 
   let state = loadState();
   let selectedRowId = state.uiSettings.selectedRowId || null;
+  let cardDetailOpen = false;
+  let pendingUnderlyingRowId = null;
   let searchText = "";
   let codeEditTarget = null;
   let helpOpen = false;
@@ -1559,53 +1570,126 @@
     return bars;
   }
 
-  function renderRows() {
-    const rows = currentRows();
-    const occ = occupancy();
+  function visibleRows(occupancyMap = occupancy()) {
     const filter = state.uiSettings.statusFilter || "all";
     const query = searchText.trim().toLowerCase();
+    const result = [];
+    for (const row of currentRows()) {
+      const status = statusForRow(row, occupancyMap);
+      if (filter === "bound" && status.key !== "bound" && status.key !== "locked") continue;
+      if (filter === "unbound" && status.key !== "unbound") continue;
+      if (filter === "locked" && status.key !== "locked") continue;
+      if (filter === "issue" && status.key !== "issue") continue;
+      const haystack = `${row.nameZh} ${row.nameEn} ${row.description} ${row.suggestedInput} ${row.actionId}`.toLowerCase();
+      if (query && !haystack.includes(query)) continue;
+      result.push({ row, status });
+    }
+    return result;
+  }
+
+  function renderRows() {
+    const entries = visibleRows();
     dom.rows.replaceChildren();
 
     let currentGroup = "";
-    let visibleCount = 0;
-    for (const row of rows) {
-      const status = statusForRow(row, occ);
-      if (filter !== "all") {
-        if (filter === "bound" && status.key !== "bound" && status.key !== "locked") continue;
-        if (filter === "unbound" && status.key !== "unbound") continue;
-        if (filter === "locked" && status.key !== "locked") continue;
-        if (filter === "issue" && status.key !== "issue") continue;
-      }
-      const haystack = `${row.nameZh} ${row.nameEn} ${row.description} ${row.suggestedInput} ${row.actionId}`.toLowerCase();
-      if (query && !haystack.includes(query)) continue;
-
+    for (const { row, status } of entries) {
       if (row.group !== currentGroup) {
         currentGroup = row.group;
         const groupRow = makeEl("div", "card-group");
         groupRow.innerHTML = `<span>${escapeHtml(currentGroup)}</span>`;
         dom.rows.append(groupRow);
       }
-      dom.rows.append(renderBindingCard(row, status));
-      visibleCount += 1;
+      dom.rows.append(renderCompactBindingCard(row, status));
     }
 
-    if (!visibleCount) {
+    if (!entries.length) {
       dom.rows.append(makeEl("div", "empty-card", "没有匹配的动作。"));
     }
+
+    const rowId = pendingUnderlyingRowId || (cardDetailOpen ? selectedRowId : null);
+    if (rowId) {
+      pendingUnderlyingRowId = null;
+      window.requestAnimationFrame(() => syncUnderlyingRow(rowId));
+    }
+    return entries;
   }
 
-  function renderBindingCard(row, status) {
+  function compactRelationship(row, status) {
+    const relationship = status.relationship;
+    if (!relationship) return null;
+    const labels = { shared: "共享", "context-reuse": "CTX 复用", "true-conflict": "冲突" };
+    const count = relationship.type === "shared"
+      ? relationship.referenceRows.length
+      : (relationship.relatedBindings || []).length + 1;
+    return { label: labels[relationship.type], count };
+  }
+
+  function compactSlotText(binding) {
+    if (!binding?.slot) return "未分配";
+    const slot = binding.slot;
+    const hand = slot.hand === "left" ? "L" : "R";
+    const layer = slot.slotType === "axis" ? "Axis" : layerLabels[slot.layer || "base"];
+    const code = state.uiSettings.showCodes ? compactCodeForSlot(slot) : "";
+    return `${hand} · ${layer} · ${slotLabel(slot)}${code ? ` · ${code}` : ""}`;
+  }
+
+  function renderCompactBindingCard(row, status) {
     const binding = bindingForRow(row);
     const card = document.createElement("article");
-    card.className = "binding-card";
+    card.className = "binding-card compact-card";
     card.dataset.rowId = row.id;
+    card.role = "button";
+    card.tabIndex = 0;
+    card.setAttribute("aria-label", `打开 ${row.nameZh || row.nameEn || row.actionKey} 详情`);
     if (row.id === selectedRowId) card.classList.add("selected");
     if (binding?.locked) card.classList.add("locked-card");
     if (status.relationship) card.classList.add("has-relationship");
     if (status.reason === "conflict") card.classList.add("has-conflict");
-    card.addEventListener("click", () => focusBinding(row));
+    card.addEventListener("click", () => openCardDetail(row.id));
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openCardDetail(row.id);
+    });
 
-    const actionCell = makeEl("div", "card-action");
+    const statusRail = makeEl("span", `compact-status-rail ${status.tone || "muted"}`.trim());
+    const main = makeEl("div", "compact-main");
+    const primary = row.nameZh || row.nameEn || row.actionId || "未命名动作";
+    const secondary = row.nameZh && row.nameEn ? row.nameEn : row.actionId || row.activationMode || "";
+    main.append(makeEl("strong", "compact-name", primary));
+    if (secondary) main.append(makeEl("span", "compact-action-key", secondary));
+
+    const relation = compactRelationship(row, status);
+    const summary = makeEl("div", "compact-summary");
+    if (relation) {
+      const relationship = makeEl("span", `compact-relationship relationship-${status.relationship.type}`, relation.label);
+      relationship.title = `${relation.label} x${relation.count}`;
+      summary.append(relationship, makeEl("span", "compact-count", `x${relation.count}`));
+    } else {
+      summary.append(makeEl("span", `compact-status ${status.tone || "muted"}`, status.label));
+    }
+    summary.append(
+      makeEl("span", "compact-mode", `MODE ${activationModeForRow(row)}`),
+      makeEl("span", "compact-context", `CTX ${contextSummary(row)}`),
+    );
+
+    const slot = makeEl("div", `compact-slot ${status.tone || "muted"}`.trim(), compactSlotText(binding));
+    const flags = makeEl("div", "compact-flags");
+    if (binding?.note) flags.append(makeEl("span", "compact-flag", "!"));
+    if (binding?.locked) flags.append(makeEl("span", "compact-flag locked", "LCK"));
+    flags.append(makeEl("span", "compact-open", "›"));
+
+    card.append(statusRail, main, summary, slot, flags);
+    return card;
+  }
+
+  function renderDetailedBindingCard(row, status) {
+    const binding = bindingForRow(row);
+    const detail = makeEl("div", "card-detail-content");
+    if (binding?.locked) detail.classList.add("locked-card");
+    if (status.reason === "conflict") detail.classList.add("has-conflict");
+
+    const actionCell = makeEl("div", "card-detail-action");
     const primary = row.nameZh || row.nameEn || row.actionId || "未命名动作";
     const secondary = row.nameZh && row.nameEn ? row.nameEn : row.actionId || row.activationMode || "";
     const titleRow = makeEl("div", "action-title-row");
@@ -1618,13 +1702,105 @@
     configRow.append(renderActivationModeSelect(row), renderContextPicker(row));
     actionCell.append(configRow);
 
-    const desc = makeEl("div", "card-description");
+    const desc = makeEl("div", "card-detail-description");
     desc.append(makeEl("span", "card-description-text", row.description || row.actionText || row.suggestedInput || "—"));
 
     const meta = renderBindingConsole(row, binding, status);
+    detail.append(actionCell, desc, meta);
+    return detail;
+  }
 
-    card.append(actionCell, desc, meta);
-    return card;
+  function syncUnderlyingRow(rowId) {
+    const card = dom.rows.querySelector(`[data-row-id="${rowId}"]`);
+    if (!card) return false;
+    const wrapRect = dom.cardWrap.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+    const target = dom.cardWrap.scrollTop
+      + cardRect.top - wrapRect.top
+      - (dom.cardWrap.clientHeight - cardRect.height) / 2;
+    dom.cardWrap.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+    return true;
+  }
+
+  function renderCardDetail() {
+    const entries = visibleRows();
+    if (!cardDetailOpen || !entries.length) {
+      cardDetailOpen = false;
+      dom.cardStage.classList.remove("detail-open");
+      dom.cardDetailOverlay.hidden = true;
+      dom.cardDetailOverlay.dataset.rowId = "";
+      dom.cardDetailBody.replaceChildren();
+      dom.rows.inert = false;
+      dom.rows.removeAttribute("aria-hidden");
+      return;
+    }
+
+    let index = entries.findIndex(({ row }) => row.id === selectedRowId);
+    if (index < 0) {
+      index = 0;
+      selectedRowId = entries[0].row.id;
+      saveState();
+    }
+    const { row, status } = entries[index];
+    dom.cardStage.classList.add("detail-open");
+    dom.cardDetailOverlay.hidden = false;
+    dom.cardDetailOverlay.dataset.rowId = row.id;
+    dom.cardDetailTitle.textContent = row.nameZh || row.nameEn || row.actionKey;
+    dom.cardDetailPosition.textContent = `${index + 1} / ${entries.length}`;
+    dom.cardDetailPrevious.disabled = index === 0;
+    dom.cardDetailNext.disabled = index === entries.length - 1;
+    dom.cardDetailBody.replaceChildren(renderDetailedBindingCard(row, status));
+    dom.rows.inert = true;
+    dom.rows.setAttribute("aria-hidden", "true");
+    pendingUnderlyingRowId = row.id;
+    window.requestAnimationFrame(() => syncUnderlyingRow(row.id));
+  }
+
+  function openCardDetail(rowId) {
+    const row = findRow(rowId);
+    if (!row) return;
+    cardDetailOpen = true;
+    pendingUnderlyingRowId = row.id;
+    focusBinding(row);
+  }
+
+  function closeCardDetail() {
+    if (!cardDetailOpen) return;
+    cardDetailOpen = false;
+    pendingUnderlyingRowId = selectedRowId;
+    renderCardDetail();
+    window.requestAnimationFrame(() => syncUnderlyingRow(selectedRowId));
+  }
+
+  function navigateCardDetail(direction) {
+    const entries = visibleRows();
+    const index = entries.findIndex(({ row }) => row.id === selectedRowId);
+    if (index < 0) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= entries.length) return;
+    const target = entries[targetIndex].row;
+    pendingUnderlyingRowId = target.id;
+    focusBinding(target);
+  }
+
+  function reconcileCardDetailSelection() {
+    if (!cardDetailOpen) return;
+    const entries = visibleRows();
+    if (!entries.length) {
+      cardDetailOpen = false;
+      return;
+    }
+    if (entries.some(({ row }) => row.id === selectedRowId)) return;
+    const row = entries[0].row;
+    selectedRowId = row.id;
+    const binding = bindingForRow(row);
+    if (binding?.slot) {
+      syncSlotLayerContext(binding.slot);
+    } else {
+      clearPendingTarget();
+    }
+    pendingUnderlyingRowId = row.id;
+    saveState();
   }
 
   function renderBindingConsole(row, binding, status) {
@@ -1745,8 +1921,14 @@
   }
 
   function openContextPickerForRow(rowId) {
-    const card = dom.rows.querySelector(`[data-row-id="${rowId}"]`);
-    card?.querySelector(".context-picker-button")?.click();
+    if (dom.cardDetailOverlay.dataset.rowId === rowId) {
+      dom.cardDetailOverlay.querySelector(".context-picker-button")?.click();
+      return;
+    }
+    openCardDetail(rowId);
+    window.requestAnimationFrame(() => {
+      dom.cardDetailOverlay.querySelector(".context-picker-button")?.click();
+    });
   }
 
   function renderRelationshipMiniCard(row, binding, status) {
@@ -2343,7 +2525,7 @@
       dom.noteInput.value = value;
     }
     if (options.renderRowsAfter) {
-      renderRows();
+      render();
     }
   }
 
@@ -2539,6 +2721,7 @@
   }
 
   function render() {
+    reconcileCardDetailSelection();
     renderProfileControls();
     renderRepairControl();
     renderSyncControl();
@@ -2546,12 +2729,13 @@
     renderStickPanel("left");
     renderStickPanel("right");
     renderRows();
+    renderCardDetail();
     renderSelectionBar();
   }
 
   dom.search.addEventListener("input", (event) => {
     searchText = event.target.value;
-    renderRows();
+    render();
   });
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.addEventListener("click", () => setActiveList(button.dataset.list));
@@ -2578,6 +2762,12 @@
   dom.clearBtn.addEventListener("click", clearBinding);
   dom.noteInput.addEventListener("input", (event) => updateNote(event.target.value));
   dom.noteInput.addEventListener("change", (event) => updateNote(event.target.value, { renderRowsAfter: true }));
+  dom.cardDetailBack.addEventListener("click", closeCardDetail);
+  dom.cardDetailPrevious.addEventListener("click", () => navigateCardDetail(-1));
+  dom.cardDetailNext.addEventListener("click", () => navigateCardDetail(1));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && cardDetailOpen) closeCardDetail();
+  });
   dom.exportBtn.addEventListener("click", exportProfile);
   dom.importInput.addEventListener("change", (event) => importProfile(event.target.files[0]));
   dom.syncBtn.addEventListener("click", openSyncDialog);

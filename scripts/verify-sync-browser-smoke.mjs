@@ -169,13 +169,13 @@ function smokeInjectSource() {
 
 async function serveSmokeHtml() {
   const original = await readFile(path.join(appRoot, "index.html"), "utf8");
-  const needle = '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="./app.js?v=retro-40"></script>';
+  const needle = '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="./app.js?v=retro-41"></script>';
   if (!original.includes(needle)) {
     throw new Error("Unable to find sync-core/app.js script boundary in index.html");
   }
   return original.replace(
     needle,
-    '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="/__sync-smoke-inject.js"></script>\n    <script src="./app.js?v=retro-40"></script>',
+    '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="/__sync-smoke-inject.js"></script>\n    <script src="./app.js?v=retro-41"></script>',
   );
 }
 
@@ -356,11 +356,36 @@ function pageExpression() {
       repairCandidateCount: $("#repairTargetSelect").options.length,
       modeSelectCount: document.querySelectorAll(".activation-mode-select").length,
       contextControlCount: document.querySelectorAll(".context-picker-button").length,
+      compactCardCount: document.querySelectorAll("#bindingRows .binding-card.compact-card").length,
+      inlineModeControlCount: document.querySelectorAll("#bindingRows .activation-mode-select").length,
+      inlineContextControlCount: document.querySelectorAll("#bindingRows .context-picker-button").length,
+      detailOpen: !$("#cardDetailOverlay").hidden,
+      detailRowId: $("#cardDetailOverlay").dataset.rowId || "",
+      detailTitle: $("#cardDetailTitle").textContent || "",
+      detailPosition: $("#cardDetailPosition").textContent || "",
+      detailModeControlCount: document.querySelectorAll("#cardDetailOverlay .activation-mode-select").length,
+      detailContextControlCount: document.querySelectorAll("#cardDetailOverlay .context-picker-button").length,
+      detailStatePersisted: Object.keys(workspace.uiSettings || {}).some((key) => /detail|overlay/i.test(key)),
+      selectedCompactRowId: document.querySelector("#bindingRows .binding-card.selected")?.dataset.rowId || "",
+      currentStickSlotCount: document.querySelectorAll(".stick-panel .slot.current").length,
+      cardWrapScrollTop: $("#cardWrap").scrollTop,
+      selectedRowCentered: (() => {
+        const wrap = $("#cardWrap").getBoundingClientRect();
+        const selected = document.querySelector("#bindingRows .binding-card.selected")?.getBoundingClientRect();
+        if (!selected) return false;
+        const center = selected.top + selected.height / 2;
+        return center >= wrap.top + wrap.height * 0.2 && center <= wrap.bottom - wrap.height * 0.2;
+      })(),
+      detailMatchesStageWidth: (() => {
+        const stage = $("#cardStage").getBoundingClientRect();
+        const detail = $("#cardDetailOverlay").getBoundingClientRect();
+        return Math.abs(stage.width - detail.width) <= 1;
+      })(),
       defaultActionContexts: workspace.profiles?.default?.actionContexts || {},
       rowRelationships: {
-        scenario1: document.querySelector('[data-row-id="scenario-1"] .conflict-mini-tag')?.textContent || "",
-        scenario8: document.querySelector('[data-row-id="scenario-8"] .conflict-mini-tag')?.textContent || "",
-        scenario69: document.querySelector('[data-row-id="scenario-69"] .conflict-mini-tag')?.textContent || "",
+        scenario1: document.querySelector('[data-row-id="scenario-1"] .compact-relationship')?.textContent || "",
+        scenario8: document.querySelector('[data-row-id="scenario-8"] .compact-relationship')?.textContent || "",
+        scenario69: document.querySelector('[data-row-id="scenario-69"] .compact-relationship')?.textContent || "",
       },
       rowConflicts: {
         scenario1: document.querySelector('[data-row-id="scenario-1"]')?.classList.contains("has-conflict") || false,
@@ -406,10 +431,18 @@ function pageExpression() {
       "create profile " + expectedId,
     );
   };
+  const openDetail = async (rowId) => {
+    click(\`[data-row-id="\${rowId}"]\`);
+    await waitFor(
+      (current) => current.detailOpen && current.detailRowId === rowId && current.selectedCompactRowId === rowId,
+      \`open detail \${rowId}\`,
+    );
+  };
   const setRowContext = async (rowId, actionKey, contextId) => {
-    click(\`[data-row-id="\${rowId}"] .context-picker-button\`);
-    setChecked(\`[data-row-id="\${rowId}"] .context-option input[value="\${contextId}"]\`, true);
-    click(\`[data-row-id="\${rowId}"] .context-picker-actions .primary\`);
+    await openDetail(rowId);
+    click("#cardDetailOverlay .context-picker-button");
+    setChecked(\`#cardDetailOverlay .context-option input[value="\${contextId}"]\`, true);
+    click("#cardDetailOverlay .context-picker-actions .primary");
     await waitFor(
       (current) => current.defaultActionContexts[actionKey]?.includes(contextId),
       \`set context \${contextId} on \${rowId}\`,
@@ -432,8 +465,10 @@ function pageExpression() {
     });
   };
 
-  if (state().modeSelectCount === 0) throw new Error("Per-action activation mode controls are missing");
-  if (state().contextControlCount === 0) throw new Error("Per-action CTX controls are missing");
+  if (state().compactCardCount === 0) throw new Error("Compact operation rows are missing");
+  if (state().inlineModeControlCount || state().inlineContextControlCount) {
+    throw new Error("Compact rows must not contain inline MODE or CTX controls");
+  }
   if (JSON.stringify(state().profileOptions) !== JSON.stringify([{ value: "default", label: "Default" }])) {
     throw new Error("New workspace must start with one Default Profile: " + JSON.stringify(state().profileOptions));
   }
@@ -444,6 +479,42 @@ function pageExpression() {
     throw new Error("Expected shared action relationship for scenario-8: " + JSON.stringify(state().rowRelationships));
   }
 
+  await openDetail("scenario-1");
+  if (!state().detailMatchesStageWidth
+    || state().detailModeControlCount !== 1
+    || state().detailContextControlCount !== 1
+    || state().detailStatePersisted) {
+    throw new Error("Detail overlay must match the list width and expose one MODE/CTX editor: " + JSON.stringify(state()));
+  }
+  click('[data-detail-command="next"]');
+  await waitFor(
+    (current) => current.detailRowId === "scenario-2"
+      && current.selectedCompactRowId === "scenario-2"
+      && current.currentStickSlotCount > 0
+      && current.selectedRowCentered,
+    "detail next selection and underlying scroll sync",
+  );
+  click('[data-detail-command="back"]');
+  await waitFor(
+    (current) => !current.detailOpen && current.selectedCompactRowId === "scenario-2" && current.selectedRowCentered,
+    "close detail",
+  );
+  record("compact detail navigation synchronized");
+
+  await openDetail("scenario-1");
+  click('[data-filter="unbound"]');
+  await waitFor(
+    (current) => current.detailOpen
+      && current.detailRowId !== "scenario-1"
+      && current.detailRowId === current.selectedCompactRowId,
+    "detail reconciles filtered selection",
+  );
+  fill("#searchInput", "__no_detail_results__");
+  await waitFor((current) => !current.detailOpen && current.compactCardCount === 0, "detail closes on empty result");
+  fill("#searchInput", "");
+  click('[data-filter="all"]');
+  await waitFor((current) => current.compactCardCount > 0, "restore rows after empty result");
+
   await setRowContext("scenario-1", "pc_interaction_select", "interaction");
   await setRowContext("scenario-69", "v_mfd_soft_select_mfd_primary_short", "mfd");
   await waitFor(
@@ -453,6 +524,8 @@ function pageExpression() {
       && !current.rowConflicts.scenario69,
     "mutually exclusive CTX reuse",
   );
+  click('[data-detail-command="back"]');
+  await waitFor((current) => !current.detailOpen, "close detail before filtering");
   click('[data-filter="issue"]');
   if (document.querySelector('[data-row-id="scenario-1"]') || document.querySelector('[data-row-id="scenario-69"]')) {
     throw new Error("CTX reuse must not appear in the problem filter");
@@ -599,9 +672,15 @@ function responsiveGeometryExpression() {
       };
       const cards = Array.from(document.querySelectorAll(".binding-card"));
       const relationshipCards = Array.from(document.querySelectorAll(".conflict-mini-card"));
+      const compactCards = Array.from(document.querySelectorAll(".binding-card.compact-card"));
       const touchControls = Array.from(document.querySelectorAll(
-        ".activation-mode-select, .context-picker-button, [data-filter], .tab-button, .conflict-mini-action",
+        ".activation-mode-select, .context-picker-button, [data-filter], .tab-button, .conflict-mini-action, .card-detail-nav",
       )).filter((element) => element.getClientRects().length > 0);
+      const detail = document.querySelector("#cardDetailOverlay");
+      const detailVisible = detail && !detail.hidden;
+      const detailNav = detailVisible
+        ? Array.from(detail.querySelectorAll(".card-detail-nav")).filter((element) => element.getClientRects().length > 0)
+        : [];
       return {
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
@@ -612,6 +691,14 @@ function responsiveGeometryExpression() {
         listControls: rect(".list-controls"),
         leftPanel: rect("#leftPanel"),
         rightPanel: rect("#rightPanel"),
+        cardStage: rect("#cardStage"),
+        cardWrap: rect("#cardWrap"),
+        compactCardHeightRange: compactCards.length
+          ? {
+            min: Math.min(...compactCards.map((element) => element.getBoundingClientRect().height)),
+            max: Math.max(...compactCards.map((element) => element.getBoundingClientRect().height)),
+          }
+          : { min: 0, max: 0 },
         overflowCards: cards
           .filter((element) => element.scrollWidth > element.clientWidth + 1)
           .map((element) => element.dataset.rowId),
@@ -621,6 +708,15 @@ function responsiveGeometryExpression() {
         minTouchControlHeight: touchControls.length
           ? Math.min(...touchControls.map((element) => element.getBoundingClientRect().height))
           : 0,
+        detail: detailVisible ? {
+          rect: rect("#cardDetailOverlay"),
+          body: rect("#cardDetailBody"),
+          horizontalOverflow: detail.scrollWidth > detail.clientWidth + 1
+            || document.querySelector("#cardDetailBody").scrollWidth > document.querySelector("#cardDetailBody").clientWidth + 1,
+          minNavHeight: detailNav.length
+            ? Math.min(...detailNav.map((element) => element.getBoundingClientRect().height))
+            : 0,
+        } : null,
       };
     })()
   `;
@@ -636,6 +732,9 @@ function assertResponsiveGeometry(viewport, result) {
       cards: result.overflowCards,
       relationships: result.overflowRelationshipCards,
     })}`);
+  }
+  if (result.compactCardHeightRange.max > 76) {
+    throw new Error(`${viewport.name} compact cards are too tall: ${JSON.stringify(result.compactCardHeightRange)}`);
   }
   if (result.listControls.left < result.list.left - tolerance || result.listControls.right > result.list.right + tolerance) {
     throw new Error(`${viewport.name} list controls escape list zone: ${JSON.stringify({
@@ -665,6 +764,21 @@ function assertResponsiveGeometry(viewport, result) {
   if ((viewport.name === "2k" || viewport.name === "4k") && result.workspace.width > 2400 + tolerance) {
     throw new Error(`${viewport.name} workspace exceeds 2400px: ${result.workspace.width}`);
   }
+  if (result.detail) {
+    if (Math.abs(result.detail.rect.width - result.cardStage.width) > tolerance
+      || Math.abs(result.detail.rect.left - result.cardStage.left) > tolerance) {
+      throw new Error(`${viewport.name} detail overlay does not match card stage: ${JSON.stringify({
+        stage: result.cardStage,
+        detail: result.detail.rect,
+      })}`);
+    }
+    if (result.detail.horizontalOverflow) {
+      throw new Error(`${viewport.name} detail overlay has horizontal overflow`);
+    }
+    if (viewport.touch && result.detail.minNavHeight < 44) {
+      throw new Error(`${viewport.name} detail navigation target below 44px: ${result.detail.minNavHeight}`);
+    }
+  }
 }
 
 async function verifyResponsiveMatrix(cdp, url) {
@@ -690,9 +804,29 @@ async function verifyResponsiveMatrix(cdp, url) {
     });
     await cdp.call("Page.navigate", { url });
     await evaluate(cdp, appReadyExpression());
-    const geometry = await evaluate(cdp, responsiveGeometryExpression());
-    assertResponsiveGeometry(viewport, geometry);
-    results.push({ name: viewport.name, ...geometry });
+    const listGeometry = await evaluate(cdp, responsiveGeometryExpression());
+    assertResponsiveGeometry(viewport, listGeometry);
+    await evaluate(cdp, `
+      (() => {
+        document.querySelector('[data-row-id="scenario-1"]').click();
+        return new Promise((resolve, reject) => {
+          const started = Date.now();
+          const timer = setInterval(() => {
+            const detail = document.querySelector("#cardDetailOverlay");
+            if (detail && !detail.hidden && detail.dataset.rowId === "scenario-1") {
+              clearInterval(timer);
+              resolve(true);
+            } else if (Date.now() - started > 5000) {
+              clearInterval(timer);
+              reject(new Error("Detail did not open for responsive verification"));
+            }
+          }, 50);
+        });
+      })()
+    `);
+    const detailGeometry = await evaluate(cdp, responsiveGeometryExpression());
+    assertResponsiveGeometry(viewport, detailGeometry);
+    results.push({ name: viewport.name, list: listGeometry, detail: detailGeometry });
   }
   return results;
 }
