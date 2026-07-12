@@ -43,4 +43,4 @@
 - [x] 7.1 Add a browser contract requiring every disclosure to follow CLR/REL at the far-right edge
 - [x] 7.2 Move disclosure controls out of the action-name area and into a fixed fifth binding-control column
 - [x] 7.3 Reduce the slot-name track and verify wide, Sidecar, and phone layouts without overflow
-- [ ] 7.4 Run regression checks and publish the corrected asset versions
+- [x] 7.4 Run regression checks and publish the corrected asset versions
