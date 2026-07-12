@@ -31,3 +31,11 @@
 - [x] 5.3 Run core, sync, repaired-export, browser, syntax, and strict OpenSpec validation
 - [x] 5.4 Update user documentation to distinguish Profile, MODE, and CTX
 - [ ] 5.5 Commit, push main, and verify the GitHub Pages deployment workflow
+
+## 6. Responsive Workspace Matrix
+
+- [ ] 6.1 Add failing geometry assertions for phone, iPad portrait/landscape, 2K, and 4K viewports
+- [ ] 6.2 Add the final operation-first, cockpit, and wide-cockpit responsive CSS layer
+- [ ] 6.3 Add coarse-pointer touch target sizing for operation controls
+- [ ] 6.4 Verify screenshots and zero horizontal/card overflow across the full matrix
+- [ ] 6.5 Commit, push main, repair the Pages environment policy, and verify deployment

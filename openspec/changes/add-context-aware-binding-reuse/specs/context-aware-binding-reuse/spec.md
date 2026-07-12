@@ -83,3 +83,22 @@ The system SHALL provide a compact per-action CTX control beside MODE and apply 
 #### Scenario: User selects GLOBAL
 - **WHEN** the user selects `GLOBAL`
 - **THEN** specific context selections are cleared and the action is treated as potentially active everywhere
+
+### Requirement: Workspace is bounded across target displays
+The system SHALL provide explicit responsive workspace modes for phone, iPad Pro portrait, iPad Pro landscape or Sidecar, 2K, and 4K displays without viewport-dependent font scaling.
+
+#### Scenario: iPad Pro portrait opens the planner
+- **WHEN** the viewport is `1024x1366`
+- **THEN** the action list is full width, both stick panels remain available below it, and the document has no horizontal overflow
+
+#### Scenario: iPad Pro landscape or Sidecar opens the planner
+- **WHEN** the viewport is `1366x1024`
+- **THEN** both stick panels and the action list remain simultaneously visible without card overflow
+
+#### Scenario: Wide desktop opens the planner
+- **WHEN** the viewport is `2560x1440` or `3840x2160`
+- **THEN** the centered workspace remains at or below `2400px` and controller rails do not stretch indefinitely
+
+#### Scenario: iPad uses touch input
+- **WHEN** the viewport reports a coarse pointer
+- **THEN** MODE, CTX, filters, and card commands expose touch-sized controls without changing text size based on viewport width

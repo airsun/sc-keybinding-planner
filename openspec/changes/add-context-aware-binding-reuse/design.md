@@ -13,6 +13,7 @@ The planner must remain a static, local-first single-page app. Whole-workspace e
 - Represent conservative per-action game contexts inside a Profile.
 - Distinguish canonical sharing, activation-mode coexistence, CTX reuse, and true conflict.
 - Edit CTX and inspect relationship evidence in the existing operation-card area.
+- Keep the complete operation workflow usable on iPad Pro, Sidecar, 2K, and 4K displays without viewport-dependent font scaling.
 
 **Non-Goals:**
 
@@ -64,6 +65,12 @@ The existing mini-card becomes a relationship mini-card:
 
 Relationship evidence includes the related action names and selected CTX labels. Shared and CTX reuse cards offer inspection/CTX editing; only conflict cards offer destructive resolution.
 
+### Use bounded responsive workspace modes
+
+The workspace uses three explicit layout bands. Up to `1180px`, the action list becomes the first full-width region and the two stick panels follow in a two-column controller rail, stacking below `700px`. From `1181px` through `1919px`, the three-column cockpit remains visible with bounded `280-320px` stick panels. At `1920px` and above, the workspace is centered and capped at `2400px` with bounded `360-400px` stick panels.
+
+Coarse-pointer devices receive larger interaction targets without changing font size from viewport width. A CSS-only scale or transform was rejected because it blurs text, damages pointer geometry, and does not solve reading-width problems on 4K displays. Keeping three columns at `1024px` was rejected because the measured minimum width is `1100px` and clips the right stick.
+
 ## Risks / Trade-offs
 
 - [Users select inaccurate CTX merely to remove red status] -> Show explicit labels and never provide a generic ignore-conflict command.
@@ -71,6 +78,7 @@ Relationship evidence includes the related action names and selected CTX labels.
 - [Multiple selected contexts become ambiguous] -> Require all cross-set pairs to be explicitly exclusive before allowing reuse.
 - [Existing exports change shape] -> Migrate v1-v3 deterministically to v4 with `GLOBAL`, and preserve all prior fields.
 - [Dense cards become crowded] -> Use a compact CTX button/popover and reuse the current mini-card footprint.
+- [Legacy CSS overrides conflict across breakpoints] -> Add one final responsive contract layer with stronger, scoped selectors and verify computed geometry at every target viewport.
 
 ## Migration Plan
 

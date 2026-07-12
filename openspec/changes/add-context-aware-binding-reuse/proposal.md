@@ -9,6 +9,7 @@ The planner currently treats `Flight`, `Ground`, `Combat`, and `Mining` as separ
 - Migrate existing bindings and unbound action settings conservatively to `GLOBAL` context under schema v4.
 - Classify same-slot relationships as `shared`, `context-reuse`, or `true-conflict` using canonical action identity, activation mode, and proven CTX exclusivity.
 - Show the classification and CTX editor in the existing card/mini-card region; only true conflicts remain in the problem filter or destructive conflict flow.
+- Add bounded responsive workspace modes for iPad Pro portrait/landscape, Sidecar, 2K, and 4K displays instead of stretching or clipping the three-column cockpit.
 - Keep the current workspace-global `deviceConfig`; Device Presets are explicitly deferred.
 
 ## Capabilities
@@ -28,3 +29,4 @@ None.
 - `binding-planner/app.js`, `index.html`, and `styles.css` gain CTX editing and three-state relationship presentation.
 - Export, import, local persistence, and GitHub sync continue to move the whole workspace JSON.
 - Existing test and browser smoke scripts gain migration, classification, filtering, and inline editing coverage.
+- Responsive smoke coverage uses explicit `1024x1366`, `1366x1024`, `2560x1440`, and `3840x2160` viewports in addition to the phone regression.
