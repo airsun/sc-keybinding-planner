@@ -133,10 +133,10 @@ openspec validate add-context-aware-binding-reuse --strict
 git diff --check
 ```
 
-- [ ] **Step 3: Commit and push implementation**
+- [x] **Step 3: Commit and push implementation**
 
 Stage only responsive implementation, tests, plan, and OpenSpec tasks. Commit to `main` and push to `origin/main`.
 
-- [ ] **Step 4: Repair Pages deployment permission and verify**
+- [x] **Step 4: Repair Pages deployment permission and verify**
 
 Allow `main` in the repository's `github-pages` environment deployment branch policy, rerun `Deploy GitHub Pages`, and verify the run conclusion is `success` before marking OpenSpec tasks 5.5 and 6.5 complete.

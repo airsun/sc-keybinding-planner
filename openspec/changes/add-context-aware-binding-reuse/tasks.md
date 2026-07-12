@@ -30,7 +30,7 @@
 - [x] 5.2 Extend browser smoke for Default Profile, CTX editing, three-state mini-cards, and problem filtering
 - [x] 5.3 Run core, sync, repaired-export, browser, syntax, and strict OpenSpec validation
 - [x] 5.4 Update user documentation to distinguish Profile, MODE, and CTX
-- [ ] 5.5 Commit, push main, and verify the GitHub Pages deployment workflow
+- [x] 5.5 Commit, push main, and verify the GitHub Pages deployment workflow
 
 ## 6. Responsive Workspace Matrix
 
@@ -38,4 +38,4 @@
 - [x] 6.2 Add the final operation-first, cockpit, and wide-cockpit responsive CSS layer
 - [x] 6.3 Add coarse-pointer touch target sizing for operation controls
 - [x] 6.4 Verify screenshots and zero horizontal/card overflow across the full matrix
-- [ ] 6.5 Commit, push main, repair the Pages environment policy, and verify deployment
+- [x] 6.5 Commit, push main, repair the Pages environment policy, and verify deployment
