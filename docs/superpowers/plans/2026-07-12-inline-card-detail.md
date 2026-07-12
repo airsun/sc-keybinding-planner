@@ -1,6 +1,6 @@
 # Inline Operation Card Detail Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Restore the pre-MODE/CTX operation card layout and move MODE, CTX, relationship, and conflict editing into a directional inline card expansion.
 
@@ -31,11 +31,11 @@
 - Consumes: Existing CDP helpers, `state()`, `responsiveGeometryExpression()`, and viewport matrix.
 - Produces: OpenSpec requirements and browser assertions for historical cards, inline detail, directional navigation, and ephemeral state.
 
-- [ ] **Step 1: Create the correction OpenSpec artifacts**
+- [x] **Step 1: Create the correction OpenSpec artifacts**
 
 Create proposal, design, delta spec, and task checklist describing removal of `operation-card-detail-overlay` behavior and addition of `operation-card-inline-detail` behavior. The delta SHALL require original direct card controls, one inline expansion, filtered Previous/Next, directional motion, and no schema changes.
 
-- [ ] **Step 2: Replace compact/overlay observations**
+- [x] **Step 2: Replace compact/overlay observations**
 
 Update `state()` with these production-facing observations:
 
@@ -53,7 +53,7 @@ inlinePosition: document.querySelector(".inline-detail-position")?.textContent |
 detailStatePersisted: Object.keys(workspace.uiSettings || {}).some((key) => /detail|expanded|transition/i.test(key)),
 ```
 
-- [ ] **Step 3: Add failing inline-navigation interactions**
+- [x] **Step 3: Add failing inline-navigation interactions**
 
 Exercise this sequence:
 
@@ -72,7 +72,7 @@ await waitFor(
 
 Also assert exactly one inline MODE/CTX editor, no floating overlay, no compact cards, no persisted expansion state, non-wrapping boundaries, and close-on-empty-filter behavior.
 
-- [ ] **Step 4: Run the browser smoke and verify RED**
+- [x] **Step 4: Run the browser smoke and verify RED**
 
 Run: `node scripts/verify-sync-browser-smoke.mjs`
 
@@ -91,7 +91,7 @@ Expected: FAIL because the current UI still renders compact cards and `#cardDeta
 - Consumes: `visibleRows()`, `renderBindingConsole()`, and existing direct binding-control helpers.
 - Produces: `renderBindingCard(row, status, visibleIndex, visibleCount)` and restored `.card-wrap > #bindingRows` structure.
 
-- [ ] **Step 1: Remove the floating overlay DOM**
+- [x] **Step 1: Remove the floating overlay DOM**
 
 Replace the card stage with the historical list mount:
 
@@ -103,7 +103,7 @@ Replace the card stage with the historical list mount:
 
 Remove `#cardStage`, `#cardDetailOverlay`, overlay navigation, heading, position, and body nodes. Bump CSS and app cache keys.
 
-- [ ] **Step 2: Restore normal card rendering**
+- [x] **Step 2: Restore normal card rendering**
 
 Replace `renderCompactBindingCard()` and `renderDetailedBindingCard()` with:
 
@@ -128,7 +128,7 @@ function renderBindingCard(row, status, visibleIndex, visibleCount) {
 
 The action cell contains title, note, secondary identity, subgroup, and one disclosure button. It does not contain MODE or CTX.
 
-- [ ] **Step 3: Keep relationship operations out of collapsed controls**
+- [x] **Step 3: Keep relationship operations out of collapsed controls**
 
 Change the binding console contract:
 
@@ -141,11 +141,11 @@ function renderBindingConsole(row, binding, status, options = {}) {
 
 Collapsed cards pass `{ includeRelationship: false }`; the inline detail owns relationship rendering.
 
-- [ ] **Step 4: Remove compact and overlay CSS**
+- [x] **Step 4: Remove compact and overlay CSS**
 
 Delete `.compact-*`, `.card-stage`, `.card-detail-overlay`, overlay header/body, and overlay container-query rules added after the `Compact operation list` marker. Restore normal `.binding-card` rules as the active layout without adding a compact height cap.
 
-- [ ] **Step 5: Run smoke and confirm the baseline assertions advance**
+- [x] **Step 5: Run smoke and confirm the baseline assertions advance**
 
 Run: `node scripts/verify-sync-browser-smoke.mjs`
 
@@ -162,7 +162,7 @@ Expected: historical cards and no-overlay assertions PASS; inline disclosure ass
 **Interfaces:**
 - Produces: `expandedRowId`, `renderInlineCardDetail(row, status, index, total)`, `toggleInlineDetail(rowId)`, `reconcileExpandedDetail(entries)`, and `syncExpandedCard(rowId, behavior)`.
 
-- [ ] **Step 1: Add ephemeral expansion state**
+- [x] **Step 1: Add ephemeral expansion state**
 
 Add outside persisted `state`:
 
@@ -175,7 +175,7 @@ let pendingExpandedScrollRowId = null;
 
 Do not add corresponding keys to `uiSettings`, workspace export, or sync configuration.
 
-- [ ] **Step 2: Render the inline detail inside the selected card**
+- [x] **Step 2: Render the inline detail inside the selected card**
 
 Append detail only when `row.id === expandedRowId`:
 
@@ -188,7 +188,7 @@ if (row.id === expandedRowId) {
 
 `renderInlineCardDetail()` renders a header with Collapse/Previous/position/Next and a body containing `renderActivationModeSelect(row)`, `renderContextPicker(row)`, and `renderRelationshipMiniCard(row, binding, status)` when a relationship exists.
 
-- [ ] **Step 3: Implement disclosure and reconciliation**
+- [x] **Step 3: Implement disclosure and reconciliation**
 
 ```js
 function toggleInlineDetail(rowId) {
@@ -208,11 +208,11 @@ function reconcileExpandedDetail(entries) {
 
 Disclosure and every detail control stop propagation.
 
-- [ ] **Step 4: Center expanded cards after render**
+- [x] **Step 4: Center expanded cards after render**
 
 Implement `syncExpandedCard()` with `scrollIntoView({ block: "center", behavior })`, using `"auto"` under reduced motion and `"smooth"` otherwise. Schedule it with `requestAnimationFrame()` only when `pendingExpandedScrollRowId` is set.
 
-- [ ] **Step 5: Run smoke for inline editing**
+- [x] **Step 5: Run smoke for inline editing**
 
 Run: `node scripts/verify-sync-browser-smoke.mjs`
 
@@ -230,7 +230,7 @@ Expected: disclosure, single expansion, inline MODE/CTX, context reuse, and ephe
 **Interfaces:**
 - Produces: `navigateInlineDetail(direction)`, `waitForDetailExit(direction)`, `.detail-enter-next`, `.detail-enter-previous`, and transition lock behavior.
 
-- [ ] **Step 1: Implement non-wrapping filtered navigation**
+- [x] **Step 1: Implement non-wrapping filtered navigation**
 
 ```js
 async function navigateInlineDetail(direction) {
@@ -249,7 +249,7 @@ async function navigateInlineDetail(direction) {
 }
 ```
 
-- [ ] **Step 2: Animate outgoing and incoming detail**
+- [x] **Step 2: Animate outgoing and incoming detail**
 
 Use Web Animations for the mounted outgoing detail and CSS for the newly rendered target:
 
@@ -265,15 +265,15 @@ detail.animate(
 
 The incoming detail uses the opposite offset. `detailMotionDuration()` returns `0` when reduced motion is active and otherwise a value between 140 and 180ms.
 
-- [ ] **Step 3: Add the thin selection frame**
+- [x] **Step 3: Add the thin selection frame**
 
 Style `.binding-card.detail-expanded` with a 1px outline and restrained corner accents. Add a single pseudo-element tracer animation; do not add a nested decorative card or change side-panel geometry. True-conflict and locked states retain their semantic colors.
 
-- [ ] **Step 4: Verify boundaries, direction, and rapid input**
+- [x] **Step 4: Verify boundaries, direction, and rapid input**
 
 Assert disabled Previous/Next boundaries, exactly one expanded card, no persisted detail state, and transition locking. Click Next twice during the transition and assert only one row advances.
 
-- [ ] **Step 5: Run behavior smoke**
+- [x] **Step 5: Run behavior smoke**
 
 Run: `node scripts/verify-sync-browser-smoke.mjs`
 
@@ -291,21 +291,21 @@ Expected: all inline-detail behavior and existing workflow steps PASS.
 - Consumes: Existing phone, iPad portrait, iPad landscape, 2K, and 4K viewport matrix.
 - Produces: stable collapsed-card geometry, in-flow expanded detail geometry, and screenshot evidence.
 
-- [ ] **Step 1: Extend responsive geometry observations**
+- [x] **Step 1: Extend responsive geometry observations**
 
 Capture collapsed card controls, expanded card/detail rectangles, horizontal overflow, side panel rectangles, and coarse-pointer detail control heights. Remove the compact-card `max <= 76px` assertion.
 
-- [ ] **Step 2: Add responsive detail layout**
+- [x] **Step 2: Add responsive detail layout**
 
 Use a two- or three-column detail grid at wider center-column sizes and one column below the existing container breakpoint. Keep typography fixed-size, controls bounded, and detail content in normal flow.
 
-- [ ] **Step 3: Verify the full viewport matrix**
+- [x] **Step 3: Verify the full viewport matrix**
 
 Run: `node scripts/verify-sync-browser-smoke.mjs`
 
 Expected: PASS for phone `390x844`, iPad portrait `1024x1366`, Sidecar/iPad landscape `1366x1024`, 2K `2560x1440`, and 4K `3840x2160`, with no document/detail horizontal overflow.
 
-- [ ] **Step 4: Inspect screenshots**
+- [x] **Step 4: Inspect screenshots**
 
 Capture Sidecar collapsed, Sidecar expanded, and 4K expanded states. Confirm the original card controls remain visible, the detail pushes only its own card/list flow, the frame is thin, and Previous/Next visibly relocates selection.
 
@@ -319,7 +319,7 @@ Capture Sidecar collapsed, Sidecar expanded, and 4K expanded states. Confirm the
 **Interfaces:**
 - Produces: completed OpenSpec checklist, fresh regression evidence, pushed commits, and successful Pages publication.
 
-- [ ] **Step 1: Run full verification**
+- [x] **Step 1: Run full verification**
 
 ```bash
 node scripts/verify-workspace-repair.mjs
@@ -334,17 +334,17 @@ git diff --check
 
 Expected: all commands exit `0`; the v4 candidate remains 4 Profiles, 372 active bindings, 1 repair item, and 0 true conflicts.
 
-- [ ] **Step 2: Stage only scoped files**
+- [x] **Step 2: Stage only scoped files**
 
 Stage planner source, smoke tests, the correction OpenSpec change, and this plan. Do not stage `.claude/`, `.codex/`, `.superpowers/`, or `repaired/`.
 
-- [ ] **Step 3: Commit and push main**
+- [x] **Step 3: Commit and push main**
 
 ```bash
 git commit -m "feat: replace overlay with inline card detail"
 git push origin main
 ```
 
-- [ ] **Step 4: Verify GitHub Pages**
+- [x] **Step 4: Verify GitHub Pages**
 
 Wait for `.github/workflows/pages.yml` to succeed for the implementation commit, then verify the public HTML serves the new CSS and app cache keys.

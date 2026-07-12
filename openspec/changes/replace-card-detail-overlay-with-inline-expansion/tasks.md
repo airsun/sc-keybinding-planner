@@ -35,5 +35,5 @@
 ## 6. Regression And Delivery
 
 - [x] 6.1 Run workspace repair, sync, v4 candidate, syntax, browser, strict OpenSpec, and diff checks
-- [ ] 6.2 Commit and push the scoped implementation to main
-- [ ] 6.3 Verify the GitHub Pages workflow and published planner asset versions
+- [x] 6.2 Commit and push the scoped implementation to main
+- [x] 6.3 Verify the GitHub Pages workflow and published planner asset versions
