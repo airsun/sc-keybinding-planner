@@ -1,11 +1,12 @@
 ## ADDED Requirements
 
 ### Requirement: Historical direct-operation cards remain the collapsed baseline
-The planner SHALL render each collapsed operation card using the pre-MODE/CTX three-column layout with action identity, note access, description, status rail, hand, layer, slot, clear, and lock controls directly available. A collapsed card MUST NOT render MODE, CTX, relationship mini-cards, or relationship resolution actions.
+The planner SHALL render each collapsed operation card using the pre-MODE/CTX three-column layout with action identity, note access, description, status rail, hand, layer, slot, clear, and lock controls directly available. The disclosure MUST occupy a narrow fixed far-right binding-control column after clear/lock and MUST NOT occupy the action-name area. A collapsed card MUST NOT render MODE, CTX, relationship mini-cards, or relationship resolution actions.
 
 #### Scenario: User works from a collapsed card
 - **WHEN** an operation card is not expanded
 - **THEN** its direct binding controls remain usable in their historical layout
+- **AND** its disclosure remains at the far-right edge after clear/lock
 - **AND** no MODE, CTX, relationship, or conflict editor is present inside that collapsed card
 
 #### Scenario: User opens advanced editing

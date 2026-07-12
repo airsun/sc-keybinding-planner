@@ -15,7 +15,7 @@ Every collapsed card keeps the original three-column layout and direct binding w
 - hand selection (`L/R`), layer selection (`Base/S1/S2`), current slot, clear, and lock controls;
 - the original card width, column proportions, and responsive behavior.
 
-The collapsed card does not render MODE, CTX, relationship mini-cards, or conflict resolution controls. It adds one small chevron disclosure button in the action area. The button opens or closes the card detail without turning the entire card into a disclosure control, so existing card controls remain independently operable.
+The collapsed card does not render MODE, CTX, relationship mini-cards, or conflict resolution controls. It adds one narrow chevron disclosure button in a fixed far-right binding-control column after `CLR/REL`; the slot-name column contracts slightly to make room. The button opens or closes the card detail without occupying the action-name area or turning the entire card into a disclosure control, so existing card controls remain independently operable.
 
 ## Inline Detail Structure
 
@@ -92,4 +92,3 @@ Browser smoke must prove:
 - expanded state is absent from export, import, sync, and local workspace persistence;
 - existing context reuse, conflict repair, Profile, sync, import/export, and v4 migration checks still pass;
 - the full responsive matrix remains free of horizontal overflow and incoherent overlap.
-

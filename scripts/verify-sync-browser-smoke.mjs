@@ -169,13 +169,13 @@ function smokeInjectSource() {
 
 async function serveSmokeHtml() {
   const original = await readFile(path.join(appRoot, "index.html"), "utf8");
-  const needle = '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="./app.js?v=retro-42"></script>';
+  const needle = '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="./app.js?v=retro-43"></script>';
   if (!original.includes(needle)) {
     throw new Error("Unable to find sync-core/app.js script boundary in index.html");
   }
   return original.replace(
     needle,
-    '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="/__sync-smoke-inject.js"></script>\n    <script src="./app.js?v=retro-42"></script>',
+    '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="/__sync-smoke-inject.js"></script>\n    <script src="./app.js?v=retro-43"></script>',
   );
 }
 
@@ -357,6 +357,20 @@ function pageExpression() {
       historicalCardCount: document.querySelectorAll("#bindingRows .binding-card:not(.compact-card)").length,
       compactCardCount: document.querySelectorAll("#bindingRows .binding-card.compact-card").length,
       directBindingControlCount: document.querySelectorAll("#bindingRows .binding-card .binding-controls").length,
+      disclosureControlCount: document.querySelectorAll("#bindingRows .binding-controls > .inline-detail-toggle").length,
+      disclosureInActionCount: document.querySelectorAll("#bindingRows .card-action .inline-detail-toggle").length,
+      rightAlignedDisclosureCount: Array.from(document.querySelectorAll("#bindingRows .binding-card"))
+        .filter((card) => {
+          const controls = card.querySelector(".binding-controls");
+          const toggle = controls?.querySelector(":scope > .inline-detail-toggle");
+          const lock = controls?.querySelector(".card-lock");
+          if (!controls || !toggle || !lock) return false;
+          const controlsRect = controls.getBoundingClientRect();
+          const toggleRect = toggle.getBoundingClientRect();
+          const lockRect = lock.getBoundingClientRect();
+          return Math.abs(toggleRect.right - controlsRect.right) <= 1
+            && toggleRect.left >= lockRect.right - 1;
+        }).length,
       collapsedModeControlCount: document.querySelectorAll("#bindingRows .binding-card:not(.detail-expanded) .activation-mode-select").length,
       collapsedContextControlCount: document.querySelectorAll("#bindingRows .binding-card:not(.detail-expanded) .context-picker-button").length,
       floatingDetailExists: Boolean(document.querySelector("#cardDetailOverlay")),
@@ -470,6 +484,11 @@ function pageExpression() {
   }
   if (state().directBindingControlCount !== state().historicalCardCount) {
     throw new Error("Every historical card must keep direct binding controls: " + JSON.stringify(state()));
+  }
+  if (state().disclosureControlCount !== state().historicalCardCount
+    || state().disclosureInActionCount
+    || state().rightAlignedDisclosureCount !== state().historicalCardCount) {
+    throw new Error("Every disclosure must occupy the far-right binding-control column: " + JSON.stringify(state()));
   }
   if (state().collapsedModeControlCount || state().collapsedContextControlCount || state().floatingDetailExists) {
     throw new Error("Collapsed cards must exclude MODE/CTX and no floating detail may exist: " + JSON.stringify(state()));
@@ -718,6 +737,8 @@ function responsiveGeometryExpression() {
         detail: detail && expandedCard ? {
           rect: rect(".inline-card-detail"),
           body: rect(".inline-detail-body"),
+          action: rect(".binding-card.detail-expanded .card-action"),
+          controls: rect(".binding-card.detail-expanded .binding-console"),
           clientWidth: detail.clientWidth,
           scrollWidth: detail.scrollWidth,
           bodyClientWidth: document.querySelector(".inline-detail-body").clientWidth,
@@ -811,6 +832,15 @@ function assertResponsiveGeometry(viewport, result) {
     }
     if (viewport.touch && result.detail.minNavHeight < 44) {
       throw new Error(`${viewport.name} detail navigation target below 44px: ${result.detail.minNavHeight}`);
+    }
+    if (viewport.name === "phone"
+      && (result.detail.action.width < result.detail.card.width * 0.8
+        || result.detail.controls.width < result.detail.card.width * 0.8)) {
+      throw new Error(`phone expanded card must keep action and controls full-width: ${JSON.stringify({
+        card: result.detail.card,
+        action: result.detail.action,
+        controls: result.detail.controls,
+      })}`);
     }
   }
 }

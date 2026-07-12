@@ -1627,7 +1627,6 @@
     const titleRow = makeEl("div", "action-title-row");
     titleRow.append(makeEl("div", "action-name", primary));
     if (binding) titleRow.append(renderCardNotePopover(row, binding));
-    titleRow.append(renderInlineDetailToggle(row));
     actionCell.append(titleRow);
     if (secondary) actionCell.append(makeEl("div", "action-sub", secondary));
     if (row.subgroup) actionCell.append(makeEl("div", "action-sub", row.subgroup));
@@ -1831,6 +1830,7 @@
     controls.append(renderSlotButton(row, binding, status));
     controls.append(renderCardClearButton(row, binding));
     controls.append(renderCardLockButton(row, binding));
+    controls.append(renderInlineDetailToggle(row));
     consoleEl.append(controls);
     return consoleEl;
   }

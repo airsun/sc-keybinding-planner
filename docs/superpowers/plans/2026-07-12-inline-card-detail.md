@@ -126,7 +126,7 @@ function renderBindingCard(row, status, visibleIndex, visibleCount) {
 }
 ```
 
-The action cell contains title, note, secondary identity, subgroup, and one disclosure button. It does not contain MODE or CTX.
+The action cell contains title, note, secondary identity, and subgroup. The binding console appends one narrow disclosure button in a fixed far-right column after `CLR/REL`, with a slightly reduced slot-name column. The action cell does not contain the disclosure, MODE, or CTX.
 
 - [x] **Step 3: Keep relationship operations out of collapsed controls**
 

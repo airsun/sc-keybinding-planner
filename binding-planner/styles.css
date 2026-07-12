@@ -5823,7 +5823,7 @@ body.help-open {
 
 .binding-controls,
 .binding-console.has-conflict .binding-controls {
-  grid-template-columns: auto auto minmax(112px, 148px) 34px;
+  grid-template-columns: auto auto minmax(96px, 126px) 34px 30px;
   column-gap: 5px;
 }
 
@@ -5838,8 +5838,13 @@ body.help-open {
 }
 
 .slot-pill {
-  min-width: 112px;
-  max-width: 148px;
+  min-width: 96px;
+  max-width: 126px;
+}
+
+.binding-controls > .inline-detail-toggle {
+  grid-column: 5;
+  grid-row: 1 / span 2;
 }
 
 /* Workspace v3 repair and per-action activation mode controls. */
@@ -5932,7 +5937,7 @@ body.help-open {
 
   .binding-controls,
   .binding-console.has-conflict .binding-controls {
-    grid-template-columns: auto minmax(0, 1fr) 34px;
+    grid-template-columns: auto minmax(0, 1fr) 34px 30px;
     grid-template-rows: minmax(28px, auto) minmax(34px, auto);
   }
 
@@ -5979,6 +5984,11 @@ body.help-open {
   .binding-console.has-conflict .binding-controls > .card-lock {
     grid-column: 3;
     grid-row: 2;
+  }
+
+  .binding-controls > .inline-detail-toggle {
+    grid-column: 4;
+    grid-row: 1 / span 2;
   }
 
   .repair-card {
@@ -6255,11 +6265,11 @@ body.help-open {
 
 .inline-detail-toggle {
   flex: 0 0 auto;
-  width: 26px;
-  min-width: 26px;
-  height: 24px;
-  min-height: 24px;
-  margin-left: auto;
+  width: 30px;
+  min-width: 30px;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
   border: 1px solid rgba(214, 182, 108, 0.38);
   padding: 0;
   color: var(--amber);
@@ -6526,19 +6536,24 @@ body.help-open {
   }
 }
 
+@media (max-width: 700px) {
+  .binding-card.detail-expanded {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "action"
+      "desc"
+      "meta"
+      "detail";
+  }
+}
+
 @media (pointer: coarse) {
   .inline-detail-pager {
     grid-template-columns: 44px 44px minmax(62px, auto) 44px;
   }
 
-  .inline-detail-toggle,
   .inline-detail-nav {
     min-height: 44px;
-  }
-
-  .inline-detail-toggle {
-    width: 44px;
-    min-width: 44px;
   }
 
   .inline-detail-nav {

@@ -24,7 +24,7 @@ Commit `f91cedb` is the collapsed-card composition reference because it predates
 
 ### Restore the historical card before adding detail
 
-`renderBindingCard()` will return to the `f91cedb` three-column structure. The only collapsed-state addition is a disclosure icon in the action area. This provides an explicit regression boundary and prevents the advanced editor from redefining the base card again.
+`renderBindingCard()` will return to the `f91cedb` three-column structure. The only collapsed-state addition is a narrow disclosure icon in a fixed far-right binding-control column after `CLR/REL`; the slot-name track contracts slightly to make room. This keeps the action-name area unchanged and prevents the advanced editor from redefining the base card again.
 
 Alternative considered: adapt the compact row into an accordion. Rejected because it would preserve the exact layout and operability regression being corrected.
 
