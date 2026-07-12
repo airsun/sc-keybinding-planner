@@ -142,10 +142,10 @@ git diff --check
 
 Capture iPad landscape/Sidecar and 4K list/detail states. Confirm compact density, overlay width equality, no horizontal overflow, stick accessibility, and selected-row restoration.
 
-- [ ] **Step 3: Commit and push**
+- [x] **Step 3: Commit and push**
 
 Stage only this change's source, tests, OpenSpec artifacts, and docs; commit to `main` and push `origin/main`.
 
-- [ ] **Step 4: Verify publication**
+- [x] **Step 4: Verify publication**
 
 Wait for `Deploy GitHub Pages` to succeed and verify the public page serves the new cache keys.

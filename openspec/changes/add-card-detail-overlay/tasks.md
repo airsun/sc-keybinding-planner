@@ -30,4 +30,4 @@
 - [x] 5.1 Run workspace repair, sync core, candidate workspace, syntax, and strict OpenSpec checks
 - [x] 5.2 Run browser behavior and full viewport matrix smoke
 - [x] 5.3 Inspect iPad landscape/Sidecar and 4K screenshots for density, overlap, and scroll synchronization
-- [ ] 5.4 Commit and push main, then verify the GitHub Pages workflow and published asset version
+- [x] 5.4 Commit and push main, then verify the GitHub Pages workflow and published asset version
