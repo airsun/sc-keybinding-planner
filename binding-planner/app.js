@@ -1,7 +1,14 @@
 (function () {
-  const seed = window.VKB_PLANNER_SEED;
+  const workspaceCore = window.VKB_WORKSPACE_CORE;
+  if (!workspaceCore) throw new Error("Workspace core is unavailable.");
+  const seed = workspaceCore.normalizeSeed(window.VKB_PLANNER_SEED);
+  const syncCore = window.VKB_SYNC_CORE;
   const storageKey = "sc-dual-vkb-binding-planner:v1";
-  const workspaceSchemaVersion = 2;
+  const workspaceSchemaVersion = workspaceCore.WORKSPACE_SCHEMA_VERSION;
+  const activationModes = [
+    workspaceCore.DEFAULT_ACTIVATION_MODE,
+    ...new Set([...seed.gameRows, ...seed.scenarioRows].map((row) => row.activationMode)),
+  ].filter((mode, index, values) => mode && values.indexOf(mode) === index);
   const layers = ["base", "shift1", "shift2"];
   const layerLabels = { base: "Base", shift1: "S1", shift2: "S2" };
   const handLabels = { left: "左杆", right: "右杆" };
@@ -28,6 +35,29 @@
     toggleCodesBtn: document.getElementById("toggleCodesBtn"),
     exportBtn: document.getElementById("exportBtn"),
     importInput: document.getElementById("importInput"),
+    syncBtn: document.getElementById("syncBtn"),
+    syncDialog: document.getElementById("syncDialog"),
+    syncProviderSelect: document.getElementById("syncProviderSelect"),
+    syncOwnerInput: document.getElementById("syncOwnerInput"),
+    syncRepoInput: document.getElementById("syncRepoInput"),
+    syncBranchInput: document.getElementById("syncBranchInput"),
+    syncPathInput: document.getElementById("syncPathInput"),
+    syncTokenInput: document.getElementById("syncTokenInput"),
+    syncRememberToken: document.getElementById("syncRememberToken"),
+    syncTokenLink: document.getElementById("syncTokenLink"),
+    syncStatus: document.getElementById("syncStatus"),
+    syncSaveBtn: document.getElementById("syncSaveBtn"),
+    syncTestBtn: document.getElementById("syncTestBtn"),
+    syncPullBtn: document.getElementById("syncPullBtn"),
+    syncPushBtn: document.getElementById("syncPushBtn"),
+    syncForcePushBtn: document.getElementById("syncForcePushBtn"),
+    repairBtn: document.getElementById("repairBtn"),
+    repairDialog: document.getElementById("repairDialog"),
+    repairStatus: document.getElementById("repairStatus"),
+    repairIssueSummary: document.getElementById("repairIssueSummary"),
+    repairTargetSelect: document.getElementById("repairTargetSelect"),
+    repairModeSelect: document.getElementById("repairModeSelect"),
+    repairResolveBtn: document.getElementById("repairResolveBtn"),
     codeDialog: document.getElementById("codeDialog"),
     codeDialogKicker: document.getElementById("codeDialogKicker"),
     codeDialogTitle: document.getElementById("codeDialogTitle"),
@@ -65,6 +95,12 @@
       controls: [
         { label: "⇩", note: "导出 workspace JSON。", selector: "#exportBtn" },
         { label: "⇧", note: "导入 workspace JSON。", selector: ".import-button" },
+      ],
+    },
+    {
+      title: "在线同步",
+      controls: [
+        { label: "⇄", note: "打开 GitHub workspace 同步。", selector: "#syncBtn" },
       ],
     },
     {
@@ -112,6 +148,11 @@
   let codeEditTarget = null;
   let helpOpen = false;
   let tooltipTarget = null;
+  let syncConfig = loadSyncConfig();
+  const syncTokenStore = syncCore.createTokenStore({ sessionStorage });
+  const syncProvider = syncCore.createGitHubRepoProvider({ fetchImpl: window.fetch.bind(window) });
+  let syncBusy = false;
+  let repairSelection = null;
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -150,7 +191,7 @@
     return normalized.slice(0, maxProfileNameLength);
   }
 
-  function makeProfile(id, name, bindings = seedBindings(), timestamps = {}) {
+  function makeProfile(id, name, bindings = seedBindings(), timestamps = {}, extras = {}) {
     const now = new Date().toISOString();
     return {
       id,
@@ -158,6 +199,8 @@
       createdAt: timestamps.createdAt || now,
       updatedAt: timestamps.updatedAt || now,
       bindings: clone(bindings || {}),
+      actionModes: clone(extras.actionModes || {}),
+      repairQueue: clone(extras.repairQueue || []),
     };
   }
 
@@ -202,6 +245,7 @@
       profile?.name || id,
       profile?.bindings || {},
       { createdAt: profile?.createdAt, updatedAt: profile?.updatedAt },
+      { actionModes: profile?.actionModes, repairQueue: profile?.repairQueue },
     );
   }
 
@@ -228,12 +272,8 @@
 
   function parseWorkspacePayload(data) {
     if (!data || typeof data !== "object") throw new Error("Invalid profile schema");
-    if (data.schemaVersion === workspaceSchemaVersion && validateWorkspaceShape(data)) {
-      return normalizeWorkspace(data);
-    }
-    if (data.schemaVersion === 1 && validateV1Payload(data)) {
-      return migrateV1Workspace(data);
-    }
+    const migrated = workspaceCore.migrateWorkspace(data);
+    if (validateWorkspaceShape(migrated)) return normalizeWorkspace(migrated);
     throw new Error("Invalid profile schema");
   }
 
@@ -281,6 +321,99 @@
     localStorage.setItem(storageKey, JSON.stringify(state));
   }
 
+  function loadSyncConfig() {
+    try {
+      const saved = localStorage.getItem(syncCore.SYNC_CONFIG_KEY);
+      return syncCore.sanitizeSyncConfig(saved ? JSON.parse(saved) : {});
+    } catch (error) {
+      console.warn("Ignoring invalid sync config", error);
+      return syncCore.sanitizeSyncConfig({});
+    }
+  }
+
+  function saveSyncConfig(nextConfig = syncConfig) {
+    syncConfig = syncCore.sanitizeSyncConfig(nextConfig);
+    localStorage.setItem(syncCore.SYNC_CONFIG_KEY, JSON.stringify(syncConfig));
+    renderSyncControl();
+    return syncConfig;
+  }
+
+  function syncConfigFromFields() {
+    const next = syncCore.sanitizeSyncConfig({
+      provider: dom.syncProviderSelect.value,
+      owner: dom.syncOwnerInput.value,
+      repo: dom.syncRepoInput.value,
+      branch: dom.syncBranchInput.value,
+      path: dom.syncPathInput.value,
+    });
+    if (sameSyncTarget(syncConfig, next)) {
+      next.lastRemoteSha = syncConfig.lastRemoteSha;
+      next.lastSyncAt = syncConfig.lastSyncAt;
+    }
+    return syncCore.sanitizeSyncConfig(next);
+  }
+
+  function sameSyncTarget(a, b) {
+    return ["provider", "owner", "repo", "branch", "path"].every((key) => (a?.[key] || "") === (b?.[key] || ""));
+  }
+
+  function persistSyncDialogState() {
+    const nextConfig = saveSyncConfig(syncConfigFromFields());
+    syncTokenStore.setToken(dom.syncTokenInput.value, {
+      rememberForSession: dom.syncRememberToken.checked,
+    });
+    return {
+      config: nextConfig,
+      token: syncTokenStore.getToken(),
+    };
+  }
+
+  function validateSyncReady(config, token) {
+    if (!config.owner || !config.repo || !config.path) {
+      showToast("请先填写 GitHub owner、repo 和 path。", { tone: "warn" });
+      return false;
+    }
+    if (!token) {
+      showToast("请先输入 GitHub token。", { tone: "warn" });
+      return false;
+    }
+    return true;
+  }
+
+  function buildWorkspaceSnapshot() {
+    const snapshot = clone(state);
+    snapshot.uiSettings = { ...snapshot.uiSettings, selectedRowId };
+    const profile = snapshot.profiles?.[snapshot.activeProfileId];
+    if (profile) profile.updatedAt = new Date().toISOString();
+    return {
+      ...snapshot,
+      schemaVersion: workspaceSchemaVersion,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  function applyPulledWorkspace(nextState, remoteSha) {
+    state = nextState;
+    selectedRowId = findRow(state.uiSettings.selectedRowId)?.id || seed.scenarioRows[0]?.id || seed.gameRows[0]?.id || null;
+    saveState();
+    saveSyncConfig({
+      ...syncConfig,
+      lastRemoteSha: remoteSha,
+      lastSyncAt: new Date().toISOString(),
+    });
+    render();
+    notifyPendingRepairs("Workspace 已从远端迁移到 v3");
+  }
+
+  function markSyncMetadata(remoteSha) {
+    saveSyncConfig({
+      ...syncConfig,
+      lastRemoteSha: remoteSha,
+      lastSyncAt: new Date().toISOString(),
+    });
+    renderSyncDialog();
+  }
+
   function profileList() {
     return Object.values(state.profiles || {});
   }
@@ -301,6 +434,128 @@
     return profile.bindings;
   }
 
+  function pendingRepairItems() {
+    const result = [];
+    for (const profile of profileList()) {
+      for (const issue of profile.repairQueue || []) {
+        result.push({ profile, issue });
+      }
+    }
+    return result;
+  }
+
+  function repairCandidateRows() {
+    return seed.gameRows.filter((row) => row.actionKey.startsWith("game:"));
+  }
+
+  function renderRepairControl() {
+    const count = pendingRepairItems().length;
+    dom.repairBtn.hidden = count === 0;
+    dom.repairBtn.classList.toggle("active", count > 0);
+    dom.repairBtn.dataset.count = String(count);
+    dom.repairBtn.title = count ? `${count} 个 binding 待修复` : "没有待修复 binding";
+    setTooltip(dom.repairBtn, dom.repairBtn.title);
+  }
+
+  function openRepairDialog() {
+    const items = pendingRepairItems();
+    if (!items.length) {
+      showToast("没有待修复 binding。", { tone: "info" });
+      return;
+    }
+    const selected = items.find((item) => item.profile.id === state.activeProfileId) || items[0];
+    repairSelection = { profileId: selected.profile.id, issueId: selected.issue.id };
+    renderRepairDialog();
+    dom.repairDialog.showModal();
+  }
+
+  function renderRepairDialog() {
+    const items = pendingRepairItems();
+    const current = items.find((item) => (
+      item.profile.id === repairSelection?.profileId && item.issue.id === repairSelection?.issueId
+    )) || items[0];
+    if (!current) {
+      repairSelection = null;
+      if (dom.repairDialog.open) dom.repairDialog.close();
+      return;
+    }
+    repairSelection = { profileId: current.profile.id, issueId: current.issue.id };
+    const binding = current.issue.binding || {};
+    const slot = binding.slot ? `${handLabels[binding.slot.hand] || binding.slot.hand} · ${slotText(binding.slot)}` : "未分配键位";
+    dom.repairStatus.textContent = `${items.length} 个待处理 · Profile: ${current.profile.name}`;
+    dom.repairIssueSummary.textContent = `原键 ${current.issue.sourceActionKey} · ${slot}${binding.note ? ` · ${binding.note}` : ""}`;
+
+    dom.repairTargetSelect.replaceChildren();
+    for (const row of repairCandidateRows()) {
+      const option = document.createElement("option");
+      option.value = row.actionKey;
+      option.textContent = `${row.order}. ${row.nameZh || row.nameEn || row.actionKey}`;
+      dom.repairTargetSelect.append(option);
+    }
+    dom.repairModeSelect.replaceChildren();
+    for (const mode of activationModes) {
+      const option = document.createElement("option");
+      option.value = mode;
+      option.textContent = mode;
+      dom.repairModeSelect.append(option);
+    }
+    dom.repairModeSelect.value = workspaceCore.DEFAULT_ACTIVATION_MODE;
+    dom.repairResolveBtn.disabled = dom.repairTargetSelect.options.length === 0;
+  }
+
+  function resolveSelectedRepair(options = {}) {
+    if (!repairSelection) return;
+    const actionKey = dom.repairTargetSelect.value;
+    const activationMode = dom.repairModeSelect.value;
+    try {
+      state = workspaceCore.resolveRepairItem(state, {
+        ...repairSelection,
+        actionKey,
+        activationMode,
+        replaceExisting: Boolean(options.replaceExisting),
+      });
+    } catch (error) {
+      if (error.code === "TARGET_BINDING_EXISTS") {
+        showToast("目标操作已经有 binding。", {
+          tone: "warn",
+          actionLabel: "确认替换",
+          cancelLabel: "取消",
+          duration: 8200,
+          onAction: () => resolveSelectedRepair({ replaceExisting: true }),
+        });
+        return;
+      }
+      showToast(`修复失败：${error.message}`, { tone: "error", duration: 4200 });
+      return;
+    }
+
+    state.activeProfileId = repairSelection.profileId;
+    const targetRow = allRows().find((row) => row.actionKey === actionKey);
+    if (targetRow) selectedRowId = targetRow.id;
+    saveState();
+    render();
+    if (pendingRepairItems().length) {
+      repairSelection = null;
+      renderRepairDialog();
+    } else {
+      repairSelection = null;
+      dom.repairDialog.close();
+    }
+    showToast("歧义 binding 已归属到所选操作。", { tone: "info" });
+  }
+
+  function notifyPendingRepairs(prefix) {
+    const count = pendingRepairItems().length;
+    if (!count) return;
+    showToast(`${prefix}；${count} 个歧义 binding 已保留，等待确认归属。`, {
+      tone: "warn",
+      actionLabel: "立即修复",
+      cancelLabel: "稍后",
+      duration: 9200,
+      onAction: openRepairDialog,
+    });
+  }
+
   function renderProfileControls() {
     const profiles = profileList();
     const profile = activeProfile();
@@ -318,6 +573,194 @@
     dom.profileDeleteBtn.classList.toggle("is-protected", profiles.length <= 1);
     dom.profileDeleteBtn.title = profiles.length <= 1 ? "至少保留一个 Profile" : "删除当前 Profile";
     setTooltip(dom.profileDeleteBtn, dom.profileDeleteBtn.title);
+  }
+
+  function renderSyncControl() {
+    const configured = Boolean(syncConfig.owner && syncConfig.repo && syncConfig.path);
+    dom.syncBtn.classList.toggle("active", configured);
+    dom.syncBtn.title = configured ? `同步：${syncConfig.owner}/${syncConfig.repo}` : "同步 Workspace";
+    setTooltip(dom.syncBtn, configured ? `GitHub sync · ${syncConfig.owner}/${syncConfig.repo}` : "打开 GitHub Workspace 同步");
+  }
+
+  function renderSyncDialog() {
+    dom.syncProviderSelect.value = syncConfig.provider || "github-repo";
+    dom.syncOwnerInput.value = syncConfig.owner || "";
+    dom.syncRepoInput.value = syncConfig.repo || "";
+    dom.syncBranchInput.value = syncConfig.branch || syncCore.DEFAULT_BRANCH;
+    dom.syncPathInput.value = syncConfig.path || syncCore.DEFAULT_PATH;
+    dom.syncTokenInput.value = syncTokenStore.getToken();
+    dom.syncTokenLink.href = syncCore.buildTokenCreationUrl();
+    const target = syncConfig.owner && syncConfig.repo ? `${syncConfig.owner}/${syncConfig.repo}` : "未配置";
+    const revision = syncConfig.lastRemoteSha ? `sha ${syncConfig.lastRemoteSha.slice(0, 7)}` : "未同步";
+    dom.syncStatus.textContent = `${target} · ${syncConfig.path || syncCore.DEFAULT_PATH} · ${revision}`;
+    setSyncBusy(syncBusy);
+  }
+
+  function setSyncBusy(isBusy, message) {
+    syncBusy = isBusy;
+    for (const button of [dom.syncSaveBtn, dom.syncTestBtn, dom.syncPullBtn, dom.syncPushBtn, dom.syncForcePushBtn]) {
+      button.disabled = isBusy;
+    }
+    if (message) dom.syncStatus.textContent = message;
+  }
+
+  function openSyncDialog() {
+    renderSyncDialog();
+    dom.syncDialog.showModal();
+    window.requestAnimationFrame(() => {
+      dom.syncOwnerInput.focus();
+      if (!dom.syncOwnerInput.value) dom.syncOwnerInput.select();
+    });
+  }
+
+  function saveSyncDialog() {
+    persistSyncDialogState();
+    renderSyncDialog();
+    showToast("同步配置已保存；token 不会写入长期 localStorage。", { tone: "info" });
+  }
+
+  function syncReadErrorMessage(result) {
+    if (result.status === "inaccessible") return "无法访问 GitHub repo 或 token 权限不足。";
+    if (result.status === "network-failure") return `网络请求失败${result.message ? `：${result.message}` : "。"}`;
+    if (result.status === "error") return `GitHub API 返回异常${result.httpStatus ? `（${result.httpStatus}）` : ""}。`;
+    return "同步状态异常。";
+  }
+
+  function syncWriteErrorMessage(result) {
+    if (result.status === "conflict") return "GitHub 拒绝写入：远端文件已变化。";
+    if (result.status === "inaccessible") return "写入失败：repo 不存在、token 无效或权限不足。";
+    if (result.status === "network-failure") return `写入失败${result.message ? `：${result.message}` : "。"}`;
+    if (result.status === "error") return `写入失败${result.httpStatus ? `（${result.httpStatus}）` : ""}${result.message ? `：${result.message}` : "。"}`;
+    return "写入失败。";
+  }
+
+  async function testSyncConnection() {
+    const { config, token } = persistSyncDialogState();
+    if (!validateSyncReady(config, token)) return;
+    setSyncBusy(true, "Testing GitHub sync target...");
+    try {
+      const result = await syncProvider.test(config, token);
+      if (result.status === "readable") {
+        dom.syncStatus.textContent = `远端文件可读取 · sha ${result.remoteSha.slice(0, 7)}`;
+        showToast("GitHub 同步目标可读取。", { tone: "info" });
+      } else if (result.status === "missing") {
+        dom.syncStatus.textContent = "Repo 可访问；远端文件不存在，首次 Push 会创建。";
+        showToast("Repo 可访问；远端文件不存在，首次 Push 会创建。", { tone: "info", duration: 4200 });
+      } else {
+        const message = syncReadErrorMessage(result);
+        dom.syncStatus.textContent = message;
+        showToast(message, { tone: "error", duration: 5200 });
+      }
+    } finally {
+      setSyncBusy(false);
+    }
+  }
+
+  async function pullSyncWorkspace() {
+    const { config, token } = persistSyncDialogState();
+    if (!validateSyncReady(config, token)) return;
+    setSyncBusy(true, "Pulling remote workspace...");
+    try {
+      const result = await syncProvider.read(config, token, { resolveMissing: true });
+      if (result.status === "missing") {
+        const message = "远端文件不存在；可先 Push 创建。";
+        dom.syncStatus.textContent = message;
+        showToast(message, { tone: "warn" });
+        return;
+      }
+      if (result.status !== "readable") {
+        const message = syncReadErrorMessage(result);
+        dom.syncStatus.textContent = message;
+        showToast(message, { tone: "error", duration: 5200 });
+        return;
+      }
+      let nextState;
+      try {
+        nextState = parseWorkspacePayload(JSON.parse(result.text));
+      } catch (error) {
+        const message = `远端 workspace 无效：${error.message}`;
+        dom.syncStatus.textContent = message;
+        showToast(message, { tone: "error", duration: 5200 });
+        return;
+      }
+      showToast("Pull 会覆盖当前本地 workspace。", {
+        tone: "warn",
+        actionLabel: "覆盖本地",
+        cancelLabel: "取消",
+        duration: 8200,
+        onAction: () => {
+          applyPulledWorkspace(nextState, result.remoteSha);
+          renderSyncDialog();
+          showToast("Workspace 已从远端拉取。", { tone: "info" });
+        },
+      });
+      dom.syncStatus.textContent = `远端 workspace 已读取 · sha ${result.remoteSha.slice(0, 7)}`;
+    } finally {
+      setSyncBusy(false);
+    }
+  }
+
+  async function pushSyncWorkspace(options = {}) {
+    const { config, token } = persistSyncDialogState();
+    if (!validateSyncReady(config, token)) return;
+    setSyncBusy(true, options.force ? "Force pushing workspace..." : "Pushing workspace...");
+    try {
+      const readResult = await syncProvider.read(config, token, { resolveMissing: true });
+      if (readResult.status !== "readable" && readResult.status !== "missing") {
+        const message = syncReadErrorMessage(readResult);
+        dom.syncStatus.textContent = message;
+        showToast(message, { tone: "error", duration: 5200 });
+        return;
+      }
+
+      const plan = syncCore.decidePushPlan({
+        remoteStatus: readResult.status,
+        remoteSha: readResult.remoteSha,
+        lastRemoteSha: syncConfig.lastRemoteSha,
+        force: Boolean(options.force),
+      });
+      if (plan.action === "conflict") {
+        showToast("远端已变化；普通 Push 已停止。", {
+          tone: "warn",
+          actionLabel: "Force",
+          cancelLabel: "取消",
+          duration: 8200,
+          onAction: () => requestForcePush(plan.remoteSha),
+        });
+        dom.syncStatus.textContent = `远端冲突 · sha ${plan.remoteSha.slice(0, 7)}`;
+        return;
+      }
+      if (plan.action !== "create" && plan.action !== "update") {
+        const message = "当前远端状态不能安全 Push。";
+        dom.syncStatus.textContent = message;
+        showToast(message, { tone: "warn" });
+        return;
+      }
+
+      const writeResult = await syncProvider.write(config, token, buildWorkspaceSnapshot(), {
+        sha: plan.expectedSha,
+      });
+      if (writeResult.status !== "written") {
+        const message = syncWriteErrorMessage(writeResult);
+        dom.syncStatus.textContent = message;
+        showToast(message, { tone: writeResult.status === "conflict" ? "warn" : "error", duration: 5200 });
+        return;
+      }
+      markSyncMetadata(writeResult.remoteSha);
+      showToast(plan.action === "create" ? "远端 workspace 已创建。" : "Workspace 已 Push 到远端。", { tone: "info" });
+    } finally {
+      setSyncBusy(false);
+    }
+  }
+
+  function requestForcePush(remoteSha) {
+    showToast("强制 Push 会覆盖远端 workspace。", {
+      tone: "warn",
+      actionLabel: "覆盖远端",
+      cancelLabel: "取消",
+      duration: 8200,
+      onAction: () => pushSyncWorkspace({ force: true, remoteSha }),
+    });
   }
 
   function setActiveProfile(profileId) {
@@ -354,7 +797,13 @@
     const source = state.profiles[dom.profileSourceSelect.value] || activeProfile();
     const name = uniqueProfileName(rawName);
     const id = uniqueProfileId(slugifyProfileId(name, "profile"), state.profiles);
-    state.profiles[id] = makeProfile(id, name, source.bindings);
+    state.profiles[id] = makeProfile(
+      id,
+      name,
+      source.bindings,
+      {},
+      { actionModes: source.actionModes, repairQueue: source.repairQueue },
+    );
     state.activeProfileId = id;
     dom.profileDialog.close();
     saveState();
@@ -481,6 +930,19 @@
     return `${slot.hand}:${slot.control}:${slot.layer || "base"}`;
   }
 
+  function bindingOccupancyKey(binding) {
+    return `${slotKey(binding?.slot)}:${workspaceCore.normalizeActivationMode(binding?.activationMode)}`;
+  }
+
+  function physicalOccupants(occupancyMap, slot) {
+    const prefix = `${slotKey(slot)}:`;
+    const occupants = [];
+    for (const [key, items] of occupancyMap.entries()) {
+      if (key.startsWith(prefix)) occupants.push(...items);
+    }
+    return occupants;
+  }
+
   function sameSlot(a, b) {
     return slotKey(a) === slotKey(b);
   }
@@ -535,11 +997,40 @@
     return activeBindings()[row.actionKey] || null;
   }
 
+  function activationModeForRow(row) {
+    const profile = activeProfile();
+    profile.actionModes = profile.actionModes || {};
+    return workspaceCore.normalizeActivationMode(
+      bindingForRow(row)?.activationMode || profile.actionModes[row.actionKey],
+    );
+  }
+
+  function setRowActivationMode(row, value) {
+    const profile = activeProfile();
+    const binding = bindingForRow(row);
+    if (binding?.locked) {
+      showToast("这个绑定已锁定，先解除锁定再修改触发模式。", { tone: "warn" });
+      renderRows();
+      return;
+    }
+    const mode = workspaceCore.normalizeActivationMode(value);
+    profile.actionModes = profile.actionModes || {};
+    if (mode === workspaceCore.DEFAULT_ACTIVATION_MODE) {
+      delete profile.actionModes[row.actionKey];
+    } else {
+      profile.actionModes[row.actionKey] = mode;
+    }
+    if (binding) binding.activationMode = mode;
+    selectedRowId = row.id;
+    saveState();
+    render();
+  }
+
   function occupancy() {
     const map = new Map();
     for (const binding of Object.values(activeBindings())) {
       if (!binding.enabled || !binding.slot) continue;
-      const key = slotKey(binding.slot);
+      const key = bindingOccupancyKey(binding);
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(binding);
     }
@@ -548,7 +1039,7 @@
 
   function slotStatus(slot, occupancyMap) {
     const control = getControl(slot.hand, slot.control);
-    const occupants = occupancyMap.get(slotKey(slot)) || [];
+    const occupants = physicalOccupants(occupancyMap, slot);
     const code = codeForSlot(slot);
     return {
       occupied: occupants.length > 0,
@@ -563,7 +1054,7 @@
   function statusForRow(row, occupancyMap) {
     const binding = bindingForRow(row);
     if (!binding || !binding.slot) return { key: "unbound", label: "未分配", tone: "muted" };
-    const current = occupancyMap.get(slotKey(binding.slot)) || [];
+    const current = occupancyMap.get(bindingOccupancyKey(binding)) || [];
     if (current.length > 1) return { key: "issue", reason: "conflict", label: "冲突", tone: "red", conflictCount: current.length };
     if (codeForSlot(binding.slot) === "--") return { key: "issue", reason: "uncalibrated", label: "未校准", tone: "red" };
     if (binding.locked) return { key: "locked", label: "已确认", tone: "green" };
@@ -950,7 +1441,7 @@
       const slot = control.kind === "axis"
         ? { slotType: "axis", hand, control: control.id }
         : { slotType: "button", hand, control: control.id, layer: control.shiftCapable ? layer : "base" };
-      const occupants = occupancyMap.get(slotKey(slot)) || [];
+      const occupants = physicalOccupants(occupancyMap, slot);
       if (occupants.length) span.classList.add("on");
       if (occupants.some((item) => item.locked)) span.classList.add("locked");
       bars.append(span);
@@ -1012,6 +1503,7 @@
     actionCell.append(titleRow);
     if (secondary) actionCell.append(makeEl("div", "action-sub", secondary));
     if (row.subgroup) actionCell.append(makeEl("div", "action-sub", row.subgroup));
+    actionCell.append(renderActivationModeSelect(row));
 
     const desc = makeEl("div", "card-description");
     desc.append(makeEl("span", "card-description-text", row.description || row.actionText || row.suggestedInput || "—"));
@@ -1042,6 +1534,28 @@
     controls.append(renderCardLockButton(row, binding));
     consoleEl.append(controls);
     return consoleEl;
+  }
+
+  function renderActivationModeSelect(row) {
+    const wrap = makeEl("label", "activation-mode-field");
+    wrap.append(makeEl("span", "activation-mode-label", "MODE"));
+    const select = makeEl("select", "activation-mode-select");
+    select.setAttribute("aria-label", `${row.nameZh || row.nameEn || row.actionKey} 触发模式`);
+    for (const mode of activationModes) {
+      const option = document.createElement("option");
+      option.value = mode;
+      option.textContent = mode;
+      select.append(option);
+    }
+    select.value = activationModeForRow(row);
+    select.addEventListener("click", (event) => event.stopPropagation());
+    select.addEventListener("change", (event) => {
+      event.stopPropagation();
+      setRowActivationMode(row, event.target.value);
+    });
+    wrap.addEventListener("click", (event) => event.stopPropagation());
+    wrap.append(select);
+    return wrap;
   }
 
   function renderConflictMiniCard(binding, status) {
@@ -1077,7 +1591,7 @@
 
   function conflictingBindingsFor(binding) {
     if (!binding?.slot) return [];
-    return (occupancy().get(slotKey(binding.slot)) || []).filter((item) => item.actionKey !== binding.actionKey);
+    return (occupancy().get(bindingOccupancyKey(binding)) || []).filter((item) => item.actionKey !== binding.actionKey);
   }
 
   function resolveBindingConflict(binding) {
@@ -1384,8 +1898,10 @@
       return true;
     }
 
+    const activationMode = activationModeForRow(row);
     const occ = occupancy();
-    const occupants = (occ.get(slotKey(slot)) || []).filter((item) => item.actionKey !== row.actionKey);
+    const occupants = (occ.get(bindingOccupancyKey({ slot, activationMode })) || [])
+      .filter((item) => item.actionKey !== row.actionKey);
     if (occupants.some((item) => item.locked)) {
       showToast("这个键位已经锁定，先解除锁定再修改。", { tone: "warn" });
       return false;
@@ -1410,6 +1926,7 @@
     bindings[row.actionKey] = {
       actionKey: row.actionKey,
       slot,
+      activationMode,
       enabled: true,
       locked: existing?.locked || false,
       note: existing?.note || "",
@@ -1728,7 +2245,11 @@
             selectedRowId = findRow(state.uiSettings.selectedRowId)?.id || seed.scenarioRows[0]?.id || seed.gameRows[0]?.id || null;
             saveState();
             render();
-            showToast("Workspace 已导入。", { tone: "info" });
+            if (pendingRepairItems().length) {
+              notifyPendingRepairs("Workspace 已导入并迁移到 v3");
+            } else {
+              showToast("Workspace 已导入。", { tone: "info" });
+            }
           },
         });
       } catch (error) {
@@ -1781,6 +2302,8 @@
 
   function render() {
     renderProfileControls();
+    renderRepairControl();
+    renderSyncControl();
     renderTabsAndFilters();
     renderStickPanel("left");
     renderStickPanel("right");
@@ -1819,6 +2342,14 @@
   dom.noteInput.addEventListener("change", (event) => updateNote(event.target.value, { renderRowsAfter: true }));
   dom.exportBtn.addEventListener("click", exportProfile);
   dom.importInput.addEventListener("change", (event) => importProfile(event.target.files[0]));
+  dom.syncBtn.addEventListener("click", openSyncDialog);
+  dom.syncSaveBtn.addEventListener("click", saveSyncDialog);
+  dom.syncTestBtn.addEventListener("click", testSyncConnection);
+  dom.syncPullBtn.addEventListener("click", pullSyncWorkspace);
+  dom.syncPushBtn.addEventListener("click", () => pushSyncWorkspace());
+  dom.syncForcePushBtn.addEventListener("click", () => requestForcePush(syncConfig.lastRemoteSha || ""));
+  dom.repairBtn.addEventListener("click", openRepairDialog);
+  dom.repairResolveBtn.addEventListener("click", resolveSelectedRepair);
   dom.saveCodeBtn.addEventListener("click", saveCodeDialog);
   dom.copyCodeBtn.addEventListener("click", copyCodeToOtherSide);
   dom.recalcCodeBtn.addEventListener("click", recalcShiftCodes);
@@ -1865,4 +2396,5 @@
   const initialRow = selectedRowId ? findRow(selectedRowId) : null;
   if (initialRow && !bindingForRow(initialRow)) clearPendingTarget();
   render();
+  notifyPendingRepairs("本地 Workspace 已迁移到 v3");
 })();

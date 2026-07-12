@@ -46,6 +46,14 @@
             <span class="sr-only">导入 JSON</span>
             <input id="importInput" type="file" accept="application/json">
           </label>
+          <button id="syncBtn" class="panel-button icon-button sync-button" type="button" aria-label="同步 Workspace" title="同步 Workspace" data-tooltip="打开 GitHub Workspace 同步">
+            <span aria-hidden="true">⇄</span>
+            <span class="sr-only">同步 Workspace</span>
+          </button>
+          <button id="repairBtn" class="panel-button icon-button repair-button" type="button" aria-label="修复待处理绑定" title="修复待处理绑定" data-tooltip="处理导入时隔离的歧义绑定" hidden>
+            <span aria-hidden="true">!</span>
+            <span class="sr-only">修复待处理绑定</span>
+          </button>
           <button id="helpBtn" class="panel-button icon-button help-button" type="button" aria-label="打开帮助" title="打开帮助" data-tooltip="打开全屏操作说明">
             <span aria-hidden="true">?</span>
             <span class="sr-only">打开帮助</span>
@@ -155,7 +163,91 @@
       </form>
     </dialog>
 
+    <dialog id="syncDialog" class="sync-dialog">
+      <form method="dialog" class="sync-card">
+        <header>
+          <span>SYNC</span>
+          <h2>Online Workspace Sync</h2>
+        </header>
+        <div id="syncStatus" class="sync-status" role="status">未配置同步。</div>
+        <div class="sync-fields">
+          <label>
+            Provider
+            <select id="syncProviderSelect">
+              <option value="github-repo">GitHub Repo File</option>
+            </select>
+          </label>
+          <div class="sync-grid">
+            <label>
+              Owner
+              <input id="syncOwnerInput" type="text" autocomplete="off" spellcheck="false">
+            </label>
+            <label>
+              Repo
+              <input id="syncRepoInput" type="text" autocomplete="off" spellcheck="false">
+            </label>
+          </div>
+          <div class="sync-grid">
+            <label>
+              Branch
+              <input id="syncBranchInput" type="text" autocomplete="off" spellcheck="false">
+            </label>
+            <label>
+              Path
+              <input id="syncPathInput" type="text" autocomplete="off" spellcheck="false">
+            </label>
+          </div>
+          <label>
+            Token
+            <input id="syncTokenInput" type="password" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="sync-remember">
+            <input id="syncRememberToken" type="checkbox">
+            <span>本次浏览器会话记住 token</span>
+          </label>
+          <a id="syncTokenLink" class="sync-token-link" target="_blank" rel="noreferrer">创建 fine-grained GitHub token</a>
+        </div>
+        <div class="sync-actions" aria-label="同步操作">
+          <button id="syncTestBtn" type="button" data-tooltip="验证 token、repo 和远端文件状态">Test</button>
+          <button id="syncPullBtn" type="button" data-tooltip="从远端拉取 workspace，确认后覆盖本地">Pull</button>
+          <button id="syncPushBtn" type="button" data-tooltip="远端未变化时推送当前 workspace">Push</button>
+          <button id="syncForcePushBtn" type="button" data-tooltip="确认后覆盖远端 workspace">Force</button>
+        </div>
+        <menu>
+          <button value="cancel" data-tooltip="关闭同步设置">关闭</button>
+          <button id="syncSaveBtn" value="default" type="button" data-tooltip="保存同步配置，不保存长期 token">保存</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="repairDialog" class="profile-dialog repair-dialog">
+      <form method="dialog" class="profile-card repair-card">
+        <header>
+          <span>REPAIR</span>
+          <h2>修复歧义绑定</h2>
+        </header>
+        <div id="repairStatus" class="repair-status" role="status"></div>
+        <div id="repairIssueSummary" class="repair-issue-summary"></div>
+        <div class="profile-fields repair-fields">
+          <label>
+            归属操作
+            <select id="repairTargetSelect"></select>
+          </label>
+          <label>
+            触发模式
+            <select id="repairModeSelect"></select>
+          </label>
+        </div>
+        <menu>
+          <button value="cancel" data-tooltip="暂时保留待修复项">稍后处理</button>
+          <button id="repairResolveBtn" value="default" type="button" data-tooltip="将保留的 binding 归属到所选操作">确认归属</button>
+        </menu>
+      </form>
+    </dialog>
+
     <script src="./data.js?v=retro-4"></script>
-    <script src="./app.js?v=retro-37"></script>
+    <script src="./workspace-core.js?v=repair-1"></script>
+    <script src="./sync-core.js?v=sync-1"></script>
+    <script src="./app.js?v=retro-39"></script>
   </body>
 </html>

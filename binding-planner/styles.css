@@ -118,7 +118,8 @@ p {
 .brand p,
 .selection-kicker,
 .code-dialog span,
-.profile-dialog span {
+.profile-dialog span,
+.sync-dialog span {
   margin-top: 2px;
   color: var(--muted);
   font-family: var(--mono);
@@ -858,7 +859,8 @@ p {
 .tag.muted { color: var(--muted); }
 
 .code-dialog,
-.profile-dialog {
+.profile-dialog,
+.sync-dialog {
   border: 1px solid var(--line-hot);
   color: var(--text);
   background: var(--panel);
@@ -866,29 +868,34 @@ p {
 }
 
 .code-dialog::backdrop,
-.profile-dialog::backdrop {
+.profile-dialog::backdrop,
+.sync-dialog::backdrop {
   background: rgba(0, 0, 0, 0.62);
 }
 
 .code-card,
-.profile-card {
+.profile-card,
+.sync-card {
   min-width: 390px;
 }
 
 .code-card h2,
-.profile-card h2 {
+.profile-card h2,
+.sync-card h2 {
   margin: 4px 0 14px;
   font-size: 18px;
 }
 
 .code-fields,
-.profile-fields {
+.profile-fields,
+.sync-fields {
   display: grid;
   gap: 10px;
 }
 
 .code-fields label,
-.profile-fields label {
+.profile-fields label,
+.sync-fields label {
   display: grid;
   gap: 4px;
   color: var(--muted);
@@ -897,7 +904,9 @@ p {
 
 .code-fields input,
 .profile-fields input,
-.profile-fields select {
+.profile-fields select,
+.sync-fields input,
+.sync-fields select {
   height: 34px;
   border: 1px solid var(--line);
   color: var(--text);
@@ -907,7 +916,8 @@ p {
 }
 
 .code-card menu,
-.profile-card menu {
+.profile-card menu,
+.sync-card menu {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -916,11 +926,75 @@ p {
 }
 
 .code-card button,
-.profile-card button {
+.profile-card button,
+.sync-card button {
   min-height: 34px;
   border: 1px solid var(--line);
   color: var(--text);
   background: #0d151a;
+}
+
+.sync-card {
+  width: min(620px, calc(100vw - 28px));
+}
+
+.sync-status {
+  margin: 0 0 12px;
+  padding: 8px 9px;
+  border: 1px solid rgba(214, 182, 108, 0.34);
+  color: var(--text);
+  background:
+    linear-gradient(90deg, rgba(102, 212, 126, 0.08), transparent 46%),
+    rgba(0, 6, 3, 0.82);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.sync-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.sync-remember {
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.sync-remember input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--amber);
+}
+
+.sync-token-link {
+  width: fit-content;
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.sync-token-link:hover {
+  color: var(--line-hot);
+  text-decoration: underline;
+}
+
+.sync-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.sync-actions button {
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
 }
 
 /* Clear retro cockpit pass: index2 proportions + rover-panel line language. */
@@ -4606,6 +4680,16 @@ body {
     max-width: none;
   }
 
+  .sync-card {
+    min-width: 0;
+    width: calc(100vw - 24px);
+  }
+
+  .sync-grid,
+  .sync-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .workspace {
     grid-template-columns: minmax(0, 1fr);
     min-height: 0;
@@ -5555,4 +5639,152 @@ body.help-open {
 .slot-pill {
   min-width: 112px;
   max-width: 148px;
+}
+
+/* Workspace v3 repair and per-action activation mode controls. */
+.repair-button {
+  position: relative;
+  border-color: rgba(255, 179, 71, 0.72);
+  color: var(--amber);
+}
+
+.repair-button[hidden] {
+  display: none;
+}
+
+.repair-button::after {
+  content: attr(data-count);
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border: 1px solid #020403;
+  color: #020403;
+  background: var(--amber);
+  font: 700 9px/14px var(--mono);
+  text-align: center;
+}
+
+.activation-mode-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  width: min(100%, 220px);
+  margin-top: 5px;
+  gap: 6px;
+}
+
+.activation-mode-label {
+  color: var(--muted);
+  font: 700 9px/1 var(--mono);
+}
+
+.activation-mode-select {
+  width: 100%;
+  min-width: 0;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--text);
+  background: #07100b;
+  padding: 0 5px;
+  font: 10px/1 var(--mono);
+}
+
+.repair-card {
+  width: min(560px, calc(100vw - 28px));
+}
+
+.repair-status,
+.repair-issue-summary {
+  margin-bottom: 10px;
+  padding: 8px 9px;
+  border: 1px solid rgba(214, 182, 108, 0.34);
+  color: var(--text);
+  background: rgba(0, 6, 3, 0.82);
+  font: 11px/1.45 var(--mono);
+}
+
+.repair-issue-summary {
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+@media (max-width: 680px) {
+  .workspace {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .list-zone,
+  .stick-panel {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .list-zone {
+    order: -1;
+  }
+
+  .binding-controls,
+  .binding-console.has-conflict .binding-controls {
+    grid-template-columns: auto minmax(0, 1fr) 34px;
+    grid-template-rows: minmax(28px, auto) minmax(34px, auto);
+  }
+
+  .binding-console,
+  .binding-console.has-conflict {
+    grid-template-columns: 4px minmax(0, 1fr);
+  }
+
+  .binding-console.has-conflict .conflict-mini-card,
+  .binding-console.has-conflict .binding-controls {
+    grid-column: 2;
+  }
+
+  .binding-controls > .seg,
+  .binding-console.has-conflict .binding-controls > .seg {
+    grid-row: 1;
+  }
+
+  .binding-controls > .hand-seg,
+  .binding-console.has-conflict .binding-controls > .hand-seg {
+    grid-column: 1;
+  }
+
+  .binding-controls > .layer-seg,
+  .binding-console.has-conflict .binding-controls > .layer-seg {
+    grid-column: 2;
+  }
+
+  .binding-controls > .slot-pill,
+  .binding-console.has-conflict .binding-controls > .slot-pill {
+    grid-column: 1 / span 2;
+    grid-row: 2;
+    width: 100%;
+    max-width: none;
+  }
+
+  .binding-controls > .card-clear,
+  .binding-console.has-conflict .binding-controls > .card-clear {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .binding-controls > .card-lock,
+  .binding-console.has-conflict .binding-controls > .card-lock {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  .repair-card {
+    min-width: 0;
+  }
+
+  .activation-mode-field {
+    width: 100%;
+  }
 }
