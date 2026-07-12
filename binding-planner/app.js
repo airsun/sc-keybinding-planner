@@ -19,15 +19,7 @@
     leftPanel: document.getElementById("leftPanel"),
     rightPanel: document.getElementById("rightPanel"),
     rows: document.getElementById("bindingRows"),
-    cardStage: document.getElementById("cardStage"),
     cardWrap: document.getElementById("cardWrap"),
-    cardDetailOverlay: document.getElementById("cardDetailOverlay"),
-    cardDetailTitle: document.getElementById("cardDetailTitle"),
-    cardDetailPosition: document.getElementById("cardDetailPosition"),
-    cardDetailBody: document.getElementById("cardDetailBody"),
-    cardDetailBack: document.querySelector('[data-detail-command="back"]'),
-    cardDetailPrevious: document.querySelector('[data-detail-command="previous"]'),
-    cardDetailNext: document.querySelector('[data-detail-command="next"]'),
     search: document.getElementById("searchInput"),
     profileSelect: document.getElementById("profileSelect"),
     profileAddBtn: document.getElementById("profileAddBtn"),
@@ -134,22 +126,26 @@
     {
       title: "L/R + Base/S1/S2",
       controls: [
-        { label: "L / R", note: "切换左杆或右杆。", selector: "#cardDetailOverlay .hand-seg button" },
-        { label: "Base / S1 / S2", note: "切换基础层或 Shift 层。", selector: "#cardDetailOverlay .layer-seg button" },
+        { label: "L / R", note: "切换左杆或右杆。", selector: ".binding-card.selected .hand-seg button" },
+        { label: "Base / S1 / S2", note: "切换基础层或 Shift 层。", selector: ".binding-card.selected .layer-seg button" },
       ],
     },
     {
       title: "点选键位",
       controls: [
-        { label: "点选键位", note: "进入待分配状态，然后点左右摇杆按钮完成绑定。", selector: "#cardDetailOverlay .slot-pill" },
+        { label: "点选键位", note: "进入待分配状态，然后点左右摇杆按钮完成绑定。", selector: ".binding-card.selected .slot-pill" },
       ],
     },
   ];
 
   let state = loadState();
   let selectedRowId = state.uiSettings.selectedRowId || null;
-  let cardDetailOpen = false;
-  let pendingUnderlyingRowId = null;
+  let expandedRowId = null;
+  let expandedProfileId = null;
+  let expandedStateRef = null;
+  let detailTransitionDirection = null;
+  let detailTransitionLocked = false;
+  let pendingExpandedScrollRowId = null;
   let searchText = "";
   let codeEditTarget = null;
   let helpOpen = false;
@@ -1589,128 +1585,142 @@
 
   function renderRows() {
     const entries = visibleRows();
+    reconcileExpandedDetail(entries);
     dom.rows.replaceChildren();
 
     let currentGroup = "";
-    for (const { row, status } of entries) {
+    entries.forEach(({ row, status }, index) => {
       if (row.group !== currentGroup) {
         currentGroup = row.group;
         const groupRow = makeEl("div", "card-group");
         groupRow.innerHTML = `<span>${escapeHtml(currentGroup)}</span>`;
         dom.rows.append(groupRow);
       }
-      dom.rows.append(renderCompactBindingCard(row, status));
-    }
+      dom.rows.append(renderBindingCard(row, status, index, entries.length));
+    });
 
     if (!entries.length) {
       dom.rows.append(makeEl("div", "empty-card", "没有匹配的动作。"));
     }
 
-    const rowId = pendingUnderlyingRowId || (cardDetailOpen ? selectedRowId : null);
+    const rowId = pendingExpandedScrollRowId;
     if (rowId) {
-      pendingUnderlyingRowId = null;
-      window.requestAnimationFrame(() => syncUnderlyingRow(rowId));
+      pendingExpandedScrollRowId = null;
+      window.requestAnimationFrame(() => syncExpandedCard(rowId));
     }
     return entries;
   }
 
-  function compactRelationship(row, status) {
-    const relationship = status.relationship;
-    if (!relationship) return null;
-    const labels = { shared: "共享", "context-reuse": "CTX 复用", "true-conflict": "冲突" };
-    const count = relationship.type === "shared"
-      ? relationship.referenceRows.length
-      : (relationship.relatedBindings || []).length + 1;
-    return { label: labels[relationship.type], count };
-  }
-
-  function compactSlotText(binding) {
-    if (!binding?.slot) return "未分配";
-    const slot = binding.slot;
-    const hand = slot.hand === "left" ? "L" : "R";
-    const layer = slot.slotType === "axis" ? "Axis" : layerLabels[slot.layer || "base"];
-    const code = state.uiSettings.showCodes ? compactCodeForSlot(slot) : "";
-    return `${hand} · ${layer} · ${slotLabel(slot)}${code ? ` · ${code}` : ""}`;
-  }
-
-  function renderCompactBindingCard(row, status) {
+  function renderBindingCard(row, status, visibleIndex, visibleCount) {
     const binding = bindingForRow(row);
     const card = document.createElement("article");
-    card.className = "binding-card compact-card";
+    card.className = "binding-card";
     card.dataset.rowId = row.id;
-    card.role = "button";
-    card.tabIndex = 0;
-    card.setAttribute("aria-label", `打开 ${row.nameZh || row.nameEn || row.actionKey} 详情`);
+    card.dataset.relationshipType = status.relationship?.type || "";
     if (row.id === selectedRowId) card.classList.add("selected");
     if (binding?.locked) card.classList.add("locked-card");
-    if (status.relationship) card.classList.add("has-relationship");
-    if (status.reason === "conflict") card.classList.add("has-conflict");
-    card.addEventListener("click", () => openCardDetail(row.id));
-    card.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      openCardDetail(row.id);
-    });
+    card.addEventListener("click", () => focusBinding(row));
 
-    const statusRail = makeEl("span", `compact-status-rail ${status.tone || "muted"}`.trim());
-    const main = makeEl("div", "compact-main");
-    const primary = row.nameZh || row.nameEn || row.actionId || "未命名动作";
-    const secondary = row.nameZh && row.nameEn ? row.nameEn : row.actionId || row.activationMode || "";
-    main.append(makeEl("strong", "compact-name", primary));
-    if (secondary) main.append(makeEl("span", "compact-action-key", secondary));
-
-    const relation = compactRelationship(row, status);
-    const summary = makeEl("div", "compact-summary");
-    if (relation) {
-      const relationship = makeEl("span", `compact-relationship relationship-${status.relationship.type}`, relation.label);
-      relationship.title = `${relation.label} x${relation.count}`;
-      summary.append(relationship, makeEl("span", "compact-count", `x${relation.count}`));
-    } else {
-      summary.append(makeEl("span", `compact-status ${status.tone || "muted"}`, status.label));
-    }
-    summary.append(
-      makeEl("span", "compact-mode", `MODE ${activationModeForRow(row)}`),
-      makeEl("span", "compact-context", `CTX ${contextSummary(row)}`),
-    );
-
-    const slot = makeEl("div", `compact-slot ${status.tone || "muted"}`.trim(), compactSlotText(binding));
-    const flags = makeEl("div", "compact-flags");
-    if (binding?.note) flags.append(makeEl("span", "compact-flag", "!"));
-    if (binding?.locked) flags.append(makeEl("span", "compact-flag locked", "LCK"));
-    flags.append(makeEl("span", "compact-open", "›"));
-
-    card.append(statusRail, main, summary, slot, flags);
-    return card;
-  }
-
-  function renderDetailedBindingCard(row, status) {
-    const binding = bindingForRow(row);
-    const detail = makeEl("div", "card-detail-content");
-    if (binding?.locked) detail.classList.add("locked-card");
-    if (status.reason === "conflict") detail.classList.add("has-conflict");
-
-    const actionCell = makeEl("div", "card-detail-action");
+    const actionCell = makeEl("div", "card-action");
     const primary = row.nameZh || row.nameEn || row.actionId || "未命名动作";
     const secondary = row.nameZh && row.nameEn ? row.nameEn : row.actionId || row.activationMode || "";
     const titleRow = makeEl("div", "action-title-row");
     titleRow.append(makeEl("div", "action-name", primary));
     if (binding) titleRow.append(renderCardNotePopover(row, binding));
+    titleRow.append(renderInlineDetailToggle(row));
     actionCell.append(titleRow);
     if (secondary) actionCell.append(makeEl("div", "action-sub", secondary));
     if (row.subgroup) actionCell.append(makeEl("div", "action-sub", row.subgroup));
-    const configRow = makeEl("div", "action-config-row");
-    configRow.append(renderActivationModeSelect(row), renderContextPicker(row));
-    actionCell.append(configRow);
 
-    const desc = makeEl("div", "card-detail-description");
+    const desc = makeEl("div", "card-description");
     desc.append(makeEl("span", "card-description-text", row.description || row.actionText || row.suggestedInput || "—"));
 
-    const meta = renderBindingConsole(row, binding, status);
-    detail.append(actionCell, desc, meta);
+    const meta = renderBindingConsole(row, binding, status, { includeRelationship: false });
+    card.append(actionCell, desc, meta);
+
+    if (row.id === expandedRowId) {
+      card.classList.add("detail-expanded");
+      if (detailTransitionDirection) {
+        card.dataset.detailDirection = detailTransitionDirection;
+        card.classList.add(`detail-enter-${detailTransitionDirection}`);
+      }
+      card.append(renderInlineCardDetail(row, status, visibleIndex, visibleCount));
+    }
+    return card;
+  }
+
+  function renderInlineDetailToggle(row) {
+    const expanded = row.id === expandedRowId;
+    const button = makeEl("button", "inline-detail-toggle", expanded ? "⌃" : "⌄");
+    button.type = "button";
+    button.dataset.inlineDetailCommand = "toggle";
+    button.title = expanded ? "收起详情" : "展开详情编辑";
+    button.setAttribute("aria-label", `${expanded ? "收起" : "展开"} ${row.nameZh || row.nameEn || row.actionKey} 详情`);
+    button.setAttribute("aria-expanded", String(expanded));
+    button.setAttribute("aria-controls", `inline-detail-${row.id}`);
+    setTooltip(button, button.title);
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleInlineDetail(row.id);
+    });
+    return button;
+  }
+
+  function inlineDetailButton(command, label, glyph, disabled, handler) {
+    const button = makeEl("button", "inline-detail-nav", glyph);
+    button.type = "button";
+    button.dataset.inlineDetailCommand = command;
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.disabled = disabled;
+    setTooltip(button, label);
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      handler();
+    });
+    return button;
+  }
+
+  function renderInlineCardDetail(row, status, visibleIndex, visibleCount) {
+    const binding = bindingForRow(row);
+    const detail = makeEl("section", "inline-card-detail");
+    detail.id = `inline-detail-${row.id}`;
+    detail.setAttribute("aria-label", `${row.nameZh || row.nameEn || row.actionKey} 详情编辑`);
+    detail.addEventListener("click", (event) => event.stopPropagation());
+
+    const header = makeEl("header", "inline-detail-header");
+    const heading = makeEl("div", "inline-detail-heading");
+    heading.append(makeEl("span", "inline-detail-kicker", "DETAIL"));
+    heading.append(makeEl("strong", "inline-detail-title", row.nameZh || row.nameEn || row.actionKey));
+    const pager = makeEl("nav", "inline-detail-pager");
+    pager.setAttribute("aria-label", "详情导航");
+    pager.append(
+      inlineDetailButton("collapse", "收起详情", "⌃", false, collapseInlineDetail),
+      inlineDetailButton("previous", "上一个操作", "‹", visibleIndex === 0, () => navigateInlineDetail(-1)),
+      makeEl("output", "inline-detail-position", `${visibleIndex + 1} / ${visibleCount}`),
+      inlineDetailButton("next", "下一个操作", "›", visibleIndex === visibleCount - 1, () => navigateInlineDetail(1)),
+    );
+    header.append(heading, pager);
+
+    const body = makeEl("div", "inline-detail-body");
+    const settings = makeEl("div", "inline-detail-settings");
+    settings.append(renderActivationModeSelect(row), renderContextPicker(row));
+    const relationship = makeEl("div", "inline-detail-relationship");
+    if (binding?.slot && status.relationship) {
+      relationship.append(renderRelationshipMiniCard(row, binding, status));
+    } else {
+      relationship.append(makeEl("span", "inline-detail-empty", "当前键位无共享、CTX 复用或冲突关系。"));
+    }
+    body.append(settings, relationship);
+    detail.append(header, body);
     return detail;
   }
 
-  function syncUnderlyingRow(rowId) {
+  function detailMotionDuration() {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 160;
+  }
+
+  function syncExpandedCard(rowId) {
     const card = dom.rows.querySelector(`[data-row-id="${rowId}"]`);
     if (!card) return false;
     const wrapRect = dom.cardWrap.getBoundingClientRect();
@@ -1718,100 +1728,100 @@
     const target = dom.cardWrap.scrollTop
       + cardRect.top - wrapRect.top
       - (dom.cardWrap.clientHeight - cardRect.height) / 2;
-    dom.cardWrap.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+    dom.cardWrap.scrollTo({
+      top: Math.max(0, target),
+      behavior: detailMotionDuration() ? "smooth" : "auto",
+    });
     return true;
   }
 
-  function renderCardDetail() {
-    const entries = visibleRows();
-    if (!cardDetailOpen || !entries.length) {
-      cardDetailOpen = false;
-      dom.cardStage.classList.remove("detail-open");
-      dom.cardDetailOverlay.hidden = true;
-      dom.cardDetailOverlay.dataset.rowId = "";
-      dom.cardDetailBody.replaceChildren();
-      dom.rows.inert = false;
-      dom.rows.removeAttribute("aria-hidden");
-      return;
-    }
-
-    let index = entries.findIndex(({ row }) => row.id === selectedRowId);
-    if (index < 0) {
-      index = 0;
-      selectedRowId = entries[0].row.id;
-      saveState();
-    }
-    const { row, status } = entries[index];
-    dom.cardStage.classList.add("detail-open");
-    dom.cardDetailOverlay.hidden = false;
-    dom.cardDetailOverlay.dataset.rowId = row.id;
-    dom.cardDetailTitle.textContent = row.nameZh || row.nameEn || row.actionKey;
-    dom.cardDetailPosition.textContent = `${index + 1} / ${entries.length}`;
-    dom.cardDetailPrevious.disabled = index === 0;
-    dom.cardDetailNext.disabled = index === entries.length - 1;
-    dom.cardDetailBody.replaceChildren(renderDetailedBindingCard(row, status));
-    dom.rows.inert = true;
-    dom.rows.setAttribute("aria-hidden", "true");
-    pendingUnderlyingRowId = row.id;
-    window.requestAnimationFrame(() => syncUnderlyingRow(row.id));
-  }
-
-  function openCardDetail(rowId) {
+  function toggleInlineDetail(rowId) {
+    if (detailTransitionLocked) return;
     const row = findRow(rowId);
     if (!row) return;
-    cardDetailOpen = true;
-    pendingUnderlyingRowId = row.id;
+    if (expandedRowId === rowId) {
+      collapseInlineDetail();
+      return;
+    }
+    expandedRowId = row.id;
+    expandedProfileId = state.activeProfileId;
+    expandedStateRef = state;
+    detailTransitionDirection = null;
+    pendingExpandedScrollRowId = row.id;
     focusBinding(row);
   }
 
-  function closeCardDetail() {
-    if (!cardDetailOpen) return;
-    cardDetailOpen = false;
-    pendingUnderlyingRowId = selectedRowId;
-    renderCardDetail();
-    window.requestAnimationFrame(() => syncUnderlyingRow(selectedRowId));
+  function closeInlineDetailState() {
+    expandedRowId = null;
+    expandedProfileId = null;
+    expandedStateRef = null;
+    detailTransitionDirection = null;
+    pendingExpandedScrollRowId = null;
   }
 
-  function navigateCardDetail(direction) {
+  function collapseInlineDetail() {
+    if (!expandedRowId) return;
+    closeInlineDetailState();
+    render();
+  }
+
+  function waitForDetailExit(direction) {
+    const detail = expandedRowId
+      ? dom.rows.querySelector(`[data-row-id="${expandedRowId}"] .inline-card-detail`)
+      : null;
+    const duration = detailMotionDuration();
+    if (!detail || !duration || typeof detail.animate !== "function") return Promise.resolve();
+    const animation = detail.animate([
+      { opacity: 1, transform: "translateY(0)" },
+      { opacity: 0, transform: `translateY(${direction > 0 ? -8 : 8}px)` },
+    ], {
+      duration,
+      easing: "ease-in",
+      fill: "forwards",
+    });
+    return animation.finished.catch(() => undefined);
+  }
+
+  async function navigateInlineDetail(direction) {
+    if (detailTransitionLocked || !expandedRowId) return;
     const entries = visibleRows();
-    const index = entries.findIndex(({ row }) => row.id === selectedRowId);
+    const index = entries.findIndex(({ row }) => row.id === expandedRowId);
     if (index < 0) return;
     const targetIndex = index + direction;
     if (targetIndex < 0 || targetIndex >= entries.length) return;
+    detailTransitionLocked = true;
     const target = entries[targetIndex].row;
-    pendingUnderlyingRowId = target.id;
+    await waitForDetailExit(direction);
+    detailTransitionDirection = direction > 0 ? "next" : "previous";
+    expandedRowId = target.id;
+    expandedProfileId = state.activeProfileId;
+    expandedStateRef = state;
+    pendingExpandedScrollRowId = target.id;
     focusBinding(target);
+    window.setTimeout(() => {
+      detailTransitionLocked = false;
+    }, detailMotionDuration());
   }
 
-  function reconcileCardDetailSelection() {
-    if (!cardDetailOpen) return;
-    const entries = visibleRows();
-    if (!entries.length) {
-      cardDetailOpen = false;
-      return;
-    }
-    if (entries.some(({ row }) => row.id === selectedRowId)) return;
-    const row = entries[0].row;
-    selectedRowId = row.id;
-    const binding = bindingForRow(row);
-    if (binding?.slot) {
-      syncSlotLayerContext(binding.slot);
-    } else {
-      clearPendingTarget();
-    }
-    pendingUnderlyingRowId = row.id;
-    saveState();
+  function reconcileExpandedDetail(entries) {
+    if (!expandedRowId) return;
+    const profileChanged = expandedProfileId !== state.activeProfileId;
+    const workspaceChanged = expandedStateRef !== state;
+    const rowMissing = !entries.some(({ row }) => row.id === expandedRowId);
+    if (profileChanged || workspaceChanged || rowMissing) closeInlineDetailState();
   }
 
-  function renderBindingConsole(row, binding, status) {
+  function renderBindingConsole(row, binding, status, options = {}) {
     const consoleEl = makeEl("div", "binding-console");
-    if (binding?.slot && status.relationship) consoleEl.classList.add("has-conflict", "has-relationship");
+    if (options.includeRelationship && binding?.slot && status.relationship) {
+      consoleEl.classList.add("has-conflict", "has-relationship");
+    }
     const statusRail = makeEl("div", `status-rail ${status.tone || "muted"}`.trim());
     statusRail.title = status.label;
     if (binding?.note) statusRail.classList.add("noted");
     consoleEl.append(statusRail);
 
-    if (binding?.slot && status.relationship) {
+    if (options.includeRelationship && binding?.slot && status.relationship) {
       consoleEl.append(renderRelationshipMiniCard(row, binding, status));
     }
 
@@ -1921,13 +1931,21 @@
   }
 
   function openContextPickerForRow(rowId) {
-    if (dom.cardDetailOverlay.dataset.rowId === rowId) {
-      dom.cardDetailOverlay.querySelector(".context-picker-button")?.click();
+    const expandedPicker = dom.rows.querySelector(`[data-row-id="${rowId}"] .inline-card-detail .context-picker-button`);
+    if (expandedPicker) {
+      expandedPicker.click();
       return;
     }
-    openCardDetail(rowId);
+    const row = findRow(rowId);
+    if (!row) return;
+    expandedRowId = row.id;
+    expandedProfileId = state.activeProfileId;
+    expandedStateRef = state;
+    detailTransitionDirection = null;
+    pendingExpandedScrollRowId = row.id;
+    focusBinding(row);
     window.requestAnimationFrame(() => {
-      dom.cardDetailOverlay.querySelector(".context-picker-button")?.click();
+      dom.rows.querySelector(`[data-row-id="${rowId}"] .inline-card-detail .context-picker-button`)?.click();
     });
   }
 
@@ -2721,7 +2739,6 @@
   }
 
   function render() {
-    reconcileCardDetailSelection();
     renderProfileControls();
     renderRepairControl();
     renderSyncControl();
@@ -2729,7 +2746,6 @@
     renderStickPanel("left");
     renderStickPanel("right");
     renderRows();
-    renderCardDetail();
     renderSelectionBar();
   }
 
@@ -2762,11 +2778,8 @@
   dom.clearBtn.addEventListener("click", clearBinding);
   dom.noteInput.addEventListener("input", (event) => updateNote(event.target.value));
   dom.noteInput.addEventListener("change", (event) => updateNote(event.target.value, { renderRowsAfter: true }));
-  dom.cardDetailBack.addEventListener("click", closeCardDetail);
-  dom.cardDetailPrevious.addEventListener("click", () => navigateCardDetail(-1));
-  dom.cardDetailNext.addEventListener("click", () => navigateCardDetail(1));
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && cardDetailOpen) closeCardDetail();
+    if (event.key === "Escape" && expandedRowId) collapseInlineDetail();
   });
   dom.exportBtn.addEventListener("click", exportProfile);
   dom.importInput.addEventListener("change", (event) => importProfile(event.target.files[0]));

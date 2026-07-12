@@ -169,13 +169,13 @@ function smokeInjectSource() {
 
 async function serveSmokeHtml() {
   const original = await readFile(path.join(appRoot, "index.html"), "utf8");
-  const needle = '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="./app.js?v=retro-41"></script>';
+  const needle = '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="./app.js?v=retro-42"></script>';
   if (!original.includes(needle)) {
     throw new Error("Unable to find sync-core/app.js script boundary in index.html");
   }
   return original.replace(
     needle,
-    '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="/__sync-smoke-inject.js"></script>\n    <script src="./app.js?v=retro-41"></script>',
+    '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="/__sync-smoke-inject.js"></script>\n    <script src="./app.js?v=retro-42"></script>',
   );
 }
 
@@ -354,19 +354,22 @@ function pageExpression() {
       repairButtonVisible: !$("#repairBtn").hidden,
       repairDialogOpen: $("#repairDialog").open,
       repairCandidateCount: $("#repairTargetSelect").options.length,
-      modeSelectCount: document.querySelectorAll(".activation-mode-select").length,
-      contextControlCount: document.querySelectorAll(".context-picker-button").length,
+      historicalCardCount: document.querySelectorAll("#bindingRows .binding-card:not(.compact-card)").length,
       compactCardCount: document.querySelectorAll("#bindingRows .binding-card.compact-card").length,
-      inlineModeControlCount: document.querySelectorAll("#bindingRows .activation-mode-select").length,
-      inlineContextControlCount: document.querySelectorAll("#bindingRows .context-picker-button").length,
-      detailOpen: !$("#cardDetailOverlay").hidden,
-      detailRowId: $("#cardDetailOverlay").dataset.rowId || "",
-      detailTitle: $("#cardDetailTitle").textContent || "",
-      detailPosition: $("#cardDetailPosition").textContent || "",
-      detailModeControlCount: document.querySelectorAll("#cardDetailOverlay .activation-mode-select").length,
-      detailContextControlCount: document.querySelectorAll("#cardDetailOverlay .context-picker-button").length,
-      detailStatePersisted: Object.keys(workspace.uiSettings || {}).some((key) => /detail|overlay/i.test(key)),
-      selectedCompactRowId: document.querySelector("#bindingRows .binding-card.selected")?.dataset.rowId || "",
+      directBindingControlCount: document.querySelectorAll("#bindingRows .binding-card .binding-controls").length,
+      collapsedModeControlCount: document.querySelectorAll("#bindingRows .binding-card:not(.detail-expanded) .activation-mode-select").length,
+      collapsedContextControlCount: document.querySelectorAll("#bindingRows .binding-card:not(.detail-expanded) .context-picker-button").length,
+      floatingDetailExists: Boolean(document.querySelector("#cardDetailOverlay")),
+      expandedCardCount: document.querySelectorAll("#bindingRows .binding-card.detail-expanded").length,
+      expandedRowId: document.querySelector("#bindingRows .binding-card.detail-expanded")?.dataset.rowId || "",
+      inlineModeControlCount: document.querySelectorAll(".inline-card-detail .activation-mode-select").length,
+      inlineContextControlCount: document.querySelectorAll(".inline-card-detail .context-picker-button").length,
+      inlinePosition: document.querySelector(".inline-detail-position")?.textContent || "",
+      inlineDirection: document.querySelector("#bindingRows .binding-card.detail-expanded")?.dataset.detailDirection || "",
+      previousDisabled: Boolean(document.querySelector('[data-inline-detail-command="previous"]')?.disabled),
+      nextDisabled: Boolean(document.querySelector('[data-inline-detail-command="next"]')?.disabled),
+      detailStatePersisted: Object.keys(workspace.uiSettings || {}).some((key) => /detail|expanded|transition/i.test(key)),
+      selectedCardRowId: document.querySelector("#bindingRows .binding-card.selected")?.dataset.rowId || "",
       currentStickSlotCount: document.querySelectorAll(".stick-panel .slot.current").length,
       cardWrapScrollTop: $("#cardWrap").scrollTop,
       selectedRowCentered: (() => {
@@ -376,20 +379,15 @@ function pageExpression() {
         const center = selected.top + selected.height / 2;
         return center >= wrap.top + wrap.height * 0.2 && center <= wrap.bottom - wrap.height * 0.2;
       })(),
-      detailMatchesStageWidth: (() => {
-        const stage = $("#cardStage").getBoundingClientRect();
-        const detail = $("#cardDetailOverlay").getBoundingClientRect();
-        return Math.abs(stage.width - detail.width) <= 1;
-      })(),
       defaultActionContexts: workspace.profiles?.default?.actionContexts || {},
       rowRelationships: {
-        scenario1: document.querySelector('[data-row-id="scenario-1"] .compact-relationship')?.textContent || "",
-        scenario8: document.querySelector('[data-row-id="scenario-8"] .compact-relationship')?.textContent || "",
-        scenario69: document.querySelector('[data-row-id="scenario-69"] .compact-relationship')?.textContent || "",
+        scenario1: document.querySelector('[data-row-id="scenario-1"]')?.dataset.relationshipType || "",
+        scenario8: document.querySelector('[data-row-id="scenario-8"]')?.dataset.relationshipType || "",
+        scenario69: document.querySelector('[data-row-id="scenario-69"]')?.dataset.relationshipType || "",
       },
       rowConflicts: {
-        scenario1: document.querySelector('[data-row-id="scenario-1"]')?.classList.contains("has-conflict") || false,
-        scenario69: document.querySelector('[data-row-id="scenario-69"]')?.classList.contains("has-conflict") || false,
+        scenario1: document.querySelector('[data-row-id="scenario-1"]')?.dataset.relationshipType === "true-conflict",
+        scenario69: document.querySelector('[data-row-id="scenario-69"]')?.dataset.relationshipType === "true-conflict",
       },
       repairTargetBinding: window.__repairSmokeTarget
         ? workspace.profiles?.default?.bindings?.[window.__repairSmokeTarget] || null
@@ -432,17 +430,19 @@ function pageExpression() {
     );
   };
   const openDetail = async (rowId) => {
-    click(\`[data-row-id="\${rowId}"]\`);
+    click(\`[data-row-id="\${rowId}"] [data-inline-detail-command="toggle"]\`);
     await waitFor(
-      (current) => current.detailOpen && current.detailRowId === rowId && current.selectedCompactRowId === rowId,
+      (current) => current.expandedCardCount === 1
+        && current.expandedRowId === rowId
+        && current.selectedCardRowId === rowId,
       \`open detail \${rowId}\`,
     );
   };
   const setRowContext = async (rowId, actionKey, contextId) => {
     await openDetail(rowId);
-    click("#cardDetailOverlay .context-picker-button");
-    setChecked(\`#cardDetailOverlay .context-option input[value="\${contextId}"]\`, true);
-    click("#cardDetailOverlay .context-picker-actions .primary");
+    click(".inline-card-detail .context-picker-button");
+    setChecked(\`.inline-card-detail .context-option input[value="\${contextId}"]\`, true);
+    click(".inline-card-detail .context-picker-actions .primary");
     await waitFor(
       (current) => current.defaultActionContexts[actionKey]?.includes(contextId),
       \`set context \${contextId} on \${rowId}\`,
@@ -465,73 +465,81 @@ function pageExpression() {
     });
   };
 
-  if (state().compactCardCount === 0) throw new Error("Compact operation rows are missing");
-  if (state().inlineModeControlCount || state().inlineContextControlCount) {
-    throw new Error("Compact rows must not contain inline MODE or CTX controls");
+  if (!state().historicalCardCount || state().compactCardCount) {
+    throw new Error("Historical operation cards must replace compact rows: " + JSON.stringify(state()));
+  }
+  if (state().directBindingControlCount !== state().historicalCardCount) {
+    throw new Error("Every historical card must keep direct binding controls: " + JSON.stringify(state()));
+  }
+  if (state().collapsedModeControlCount || state().collapsedContextControlCount || state().floatingDetailExists) {
+    throw new Error("Collapsed cards must exclude MODE/CTX and no floating detail may exist: " + JSON.stringify(state()));
   }
   if (JSON.stringify(state().profileOptions) !== JSON.stringify([{ value: "default", label: "Default" }])) {
     throw new Error("New workspace must start with one Default Profile: " + JSON.stringify(state().profileOptions));
   }
-  if (state().rowRelationships.scenario1 !== "冲突") {
+  if (state().rowRelationships.scenario1 !== "true-conflict") {
     throw new Error("Expected initial same-slot conflict for scenario-1: " + JSON.stringify(state().rowRelationships));
   }
-  if (state().rowRelationships.scenario8 !== "共享") {
+  if (state().rowRelationships.scenario8 !== "shared") {
     throw new Error("Expected shared action relationship for scenario-8: " + JSON.stringify(state().rowRelationships));
   }
 
   await openDetail("scenario-1");
-  if (!state().detailMatchesStageWidth
-    || state().detailModeControlCount !== 1
-    || state().detailContextControlCount !== 1
+  if (state().inlineModeControlCount !== 1
+    || state().inlineContextControlCount !== 1
+    || !state().previousDisabled
     || state().detailStatePersisted) {
-    throw new Error("Detail overlay must match the list width and expose one MODE/CTX editor: " + JSON.stringify(state()));
+    throw new Error("Inline detail must expose one MODE/CTX editor and a first-row boundary: " + JSON.stringify(state()));
   }
-  click('[data-detail-command="next"]');
+  click('[data-inline-detail-command="next"]');
+  click('[data-inline-detail-command="next"]');
   await waitFor(
-    (current) => current.detailRowId === "scenario-2"
-      && current.selectedCompactRowId === "scenario-2"
+    (current) => current.expandedRowId === "scenario-2"
+      && current.selectedCardRowId === "scenario-2"
       && current.currentStickSlotCount > 0
       && current.selectedRowCentered,
-    "detail next selection and underlying scroll sync",
+    "inline detail next selection and scroll sync",
   );
-  click('[data-detail-command="back"]');
+  await sleep(260);
+  if (state().expandedRowId !== "scenario-2" || state().inlineDirection !== "next") {
+    throw new Error("Rapid navigation must advance once with next direction: " + JSON.stringify(state()));
+  }
+  click('[data-inline-detail-command="collapse"]');
   await waitFor(
-    (current) => !current.detailOpen && current.selectedCompactRowId === "scenario-2" && current.selectedRowCentered,
-    "close detail",
+    (current) => current.expandedCardCount === 0 && current.selectedCardRowId === "scenario-2",
+    "collapse inline detail",
   );
-  record("compact detail navigation synchronized");
+  record("inline detail navigation synchronized");
 
   await openDetail("scenario-1");
   click('[data-filter="unbound"]');
   await waitFor(
-    (current) => current.detailOpen
-      && current.detailRowId !== "scenario-1"
-      && current.detailRowId === current.selectedCompactRowId,
-    "detail reconciles filtered selection",
+    (current) => current.expandedCardCount === 0 && current.historicalCardCount > 0,
+    "detail closes when filtered row disappears",
   );
   fill("#searchInput", "__no_detail_results__");
-  await waitFor((current) => !current.detailOpen && current.compactCardCount === 0, "detail closes on empty result");
+  await waitFor((current) => current.expandedCardCount === 0 && current.historicalCardCount === 0, "detail stays closed on empty result");
   fill("#searchInput", "");
   click('[data-filter="all"]');
-  await waitFor((current) => current.compactCardCount > 0, "restore rows after empty result");
+  await waitFor((current) => current.historicalCardCount > 0, "restore rows after empty result");
 
   await setRowContext("scenario-1", "pc_interaction_select", "interaction");
   await setRowContext("scenario-69", "v_mfd_soft_select_mfd_primary_short", "mfd");
   await waitFor(
-    (current) => current.rowRelationships.scenario1 === "CTX 复用"
-      && current.rowRelationships.scenario69 === "CTX 复用"
+    (current) => current.rowRelationships.scenario1 === "context-reuse"
+      && current.rowRelationships.scenario69 === "context-reuse"
       && !current.rowConflicts.scenario1
       && !current.rowConflicts.scenario69,
     "mutually exclusive CTX reuse",
   );
-  click('[data-detail-command="back"]');
-  await waitFor((current) => !current.detailOpen, "close detail before filtering");
+  click('[data-inline-detail-command="collapse"]');
+  await waitFor((current) => current.expandedCardCount === 0, "close detail before filtering");
   click('[data-filter="issue"]');
   if (document.querySelector('[data-row-id="scenario-1"]') || document.querySelector('[data-row-id="scenario-69"]')) {
     throw new Error("CTX reuse must not appear in the problem filter");
   }
   click('[data-filter="all"]');
-  await waitFor((current) => current.rowRelationships.scenario1 === "CTX 复用", "restore all filter");
+  await waitFor((current) => current.rowRelationships.scenario1 === "context-reuse", "restore all filter");
   record("mutually exclusive contexts reuse one slot");
 
   await createProfile("Ground", "ground");
@@ -672,14 +680,14 @@ function responsiveGeometryExpression() {
       };
       const cards = Array.from(document.querySelectorAll(".binding-card"));
       const relationshipCards = Array.from(document.querySelectorAll(".conflict-mini-card"));
-      const compactCards = Array.from(document.querySelectorAll(".binding-card.compact-card"));
+      const collapsedCards = Array.from(document.querySelectorAll(".binding-card:not(.detail-expanded)"));
       const touchControls = Array.from(document.querySelectorAll(
-        ".activation-mode-select, .context-picker-button, [data-filter], .tab-button, .conflict-mini-action, .card-detail-nav",
+        ".activation-mode-select, .context-picker-button, [data-filter], .tab-button, .conflict-mini-action, .inline-detail-nav",
       )).filter((element) => element.getClientRects().length > 0);
-      const detail = document.querySelector("#cardDetailOverlay");
-      const detailVisible = detail && !detail.hidden;
-      const detailNav = detailVisible
-        ? Array.from(detail.querySelectorAll(".card-detail-nav")).filter((element) => element.getClientRects().length > 0)
+      const detail = document.querySelector(".inline-card-detail");
+      const expandedCard = detail?.closest(".binding-card") || null;
+      const detailNav = detail
+        ? Array.from(detail.querySelectorAll(".inline-detail-nav")).filter((element) => element.getClientRects().length > 0)
         : [];
       return {
         viewportWidth: window.innerWidth,
@@ -691,12 +699,11 @@ function responsiveGeometryExpression() {
         listControls: rect(".list-controls"),
         leftPanel: rect("#leftPanel"),
         rightPanel: rect("#rightPanel"),
-        cardStage: rect("#cardStage"),
         cardWrap: rect("#cardWrap"),
-        compactCardHeightRange: compactCards.length
+        collapsedCardHeightRange: collapsedCards.length
           ? {
-            min: Math.min(...compactCards.map((element) => element.getBoundingClientRect().height)),
-            max: Math.max(...compactCards.map((element) => element.getBoundingClientRect().height)),
+            min: Math.min(...collapsedCards.map((element) => element.getBoundingClientRect().height)),
+            max: Math.max(...collapsedCards.map((element) => element.getBoundingClientRect().height)),
           }
           : { min: 0, max: 0 },
         overflowCards: cards
@@ -708,11 +715,39 @@ function responsiveGeometryExpression() {
         minTouchControlHeight: touchControls.length
           ? Math.min(...touchControls.map((element) => element.getBoundingClientRect().height))
           : 0,
-        detail: detailVisible ? {
-          rect: rect("#cardDetailOverlay"),
-          body: rect("#cardDetailBody"),
+        detail: detail && expandedCard ? {
+          rect: rect(".inline-card-detail"),
+          body: rect(".inline-detail-body"),
+          clientWidth: detail.clientWidth,
+          scrollWidth: detail.scrollWidth,
+          bodyClientWidth: document.querySelector(".inline-detail-body").clientWidth,
+          bodyScrollWidth: document.querySelector(".inline-detail-body").scrollWidth,
+          overflowDescendants: Array.from(detail.querySelectorAll("*"))
+            .filter((element) => {
+              if (!element.getClientRects().length) return false;
+              const detailRect = detail.getBoundingClientRect();
+              const value = element.getBoundingClientRect();
+              return element.scrollWidth > element.clientWidth + 1
+                || value.left < detailRect.left - 1
+                || value.right > detailRect.right + 1;
+            })
+            .slice(0, 12)
+            .map((element) => ({
+              tag: element.tagName,
+              className: element.className,
+              clientWidth: element.clientWidth,
+              scrollWidth: element.scrollWidth,
+              rect: (() => {
+                const value = element.getBoundingClientRect();
+                return { left: value.left, right: value.right, width: value.width };
+              })(),
+            })),
+          card: (() => {
+            const value = expandedCard.getBoundingClientRect();
+            return { top: value.top, left: value.left, right: value.right, bottom: value.bottom, width: value.width, height: value.height };
+          })(),
           horizontalOverflow: detail.scrollWidth > detail.clientWidth + 1
-            || document.querySelector("#cardDetailBody").scrollWidth > document.querySelector("#cardDetailBody").clientWidth + 1,
+            || document.querySelector(".inline-detail-body").scrollWidth > document.querySelector(".inline-detail-body").clientWidth + 1,
           minNavHeight: detailNav.length
             ? Math.min(...detailNav.map((element) => element.getBoundingClientRect().height))
             : 0,
@@ -732,9 +767,6 @@ function assertResponsiveGeometry(viewport, result) {
       cards: result.overflowCards,
       relationships: result.overflowRelationshipCards,
     })}`);
-  }
-  if (result.compactCardHeightRange.max > 76) {
-    throw new Error(`${viewport.name} compact cards are too tall: ${JSON.stringify(result.compactCardHeightRange)}`);
   }
   if (result.listControls.left < result.list.left - tolerance || result.listControls.right > result.list.right + tolerance) {
     throw new Error(`${viewport.name} list controls escape list zone: ${JSON.stringify({
@@ -765,15 +797,17 @@ function assertResponsiveGeometry(viewport, result) {
     throw new Error(`${viewport.name} workspace exceeds 2400px: ${result.workspace.width}`);
   }
   if (result.detail) {
-    if (Math.abs(result.detail.rect.width - result.cardStage.width) > tolerance
-      || Math.abs(result.detail.rect.left - result.cardStage.left) > tolerance) {
-      throw new Error(`${viewport.name} detail overlay does not match card stage: ${JSON.stringify({
-        stage: result.cardStage,
+    if (result.detail.rect.left < result.detail.card.left - tolerance
+      || result.detail.rect.right > result.detail.card.right + tolerance
+      || result.detail.rect.top < result.detail.card.top - tolerance
+      || result.detail.rect.bottom > result.detail.card.bottom + tolerance) {
+      throw new Error(`${viewport.name} inline detail escapes its card: ${JSON.stringify({
+        card: result.detail.card,
         detail: result.detail.rect,
       })}`);
     }
     if (result.detail.horizontalOverflow) {
-      throw new Error(`${viewport.name} detail overlay has horizontal overflow`);
+      throw new Error(`${viewport.name} inline detail has horizontal overflow: ${JSON.stringify(result.detail)}`);
     }
     if (viewport.touch && result.detail.minNavHeight < 44) {
       throw new Error(`${viewport.name} detail navigation target below 44px: ${result.detail.minNavHeight}`);
@@ -808,12 +842,12 @@ async function verifyResponsiveMatrix(cdp, url) {
     assertResponsiveGeometry(viewport, listGeometry);
     await evaluate(cdp, `
       (() => {
-        document.querySelector('[data-row-id="scenario-1"]').click();
+        document.querySelector('[data-row-id="scenario-1"] [data-inline-detail-command="toggle"]').click();
         return new Promise((resolve, reject) => {
           const started = Date.now();
           const timer = setInterval(() => {
-            const detail = document.querySelector("#cardDetailOverlay");
-            if (detail && !detail.hidden && detail.dataset.rowId === "scenario-1") {
+            const detail = document.querySelector('[data-row-id="scenario-1"] .inline-card-detail');
+            if (detail) {
               clearInterval(timer);
               resolve(true);
             } else if (Date.now() - started > 5000) {
