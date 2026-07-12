@@ -126,7 +126,7 @@ function testWorkspaceMigration() {
   const before = clone(source);
   const migrated = core.migrateWorkspace(source);
 
-  assert.equal(migrated.schemaVersion, 3);
+  assert.equal(migrated.schemaVersion, 4);
   assert.deepEqual(Object.keys(migrated.profiles), ["flight", "ground"]);
   assert.equal(migrated.activeProfileId, "flight");
   assert.deepEqual(migrated.deviceConfig, source.deviceConfig);
@@ -136,7 +136,10 @@ function testWorkspaceMigration() {
   assert.equal(migrated.profiles.flight.bindings.valid_action.note, "keep me");
   assert.equal(migrated.profiles.flight.bindings.valid_action.locked, true);
   assert.equal(migrated.profiles.flight.bindings.valid_action.activationMode, "DEFAULT");
+  assert.deepEqual(migrated.profiles.flight.bindings.valid_action.contextIds, ["global"]);
   assert.deepEqual(migrated.profiles.flight.actionModes, { valid_action: "DOUBLE_TAP" });
+  assert.deepEqual(migrated.profiles.flight.actionContexts, {});
+  assert.equal(migrated.contextCatalog.mining.exclusiveGroup, "operator-mode");
   assert.equal(migrated.profiles.ground.bindings.ground_action.activationMode, "LONG_PRESS");
   assert.equal(migrated.profiles.flight.repairQueue.length, 1);
   assert.equal(migrated.profiles.ground.repairQueue.length, 0);
@@ -172,6 +175,7 @@ function testRepairResolution() {
   assert.equal(resolved.profiles.flight.repairQueue.length, 0);
   assert.equal(resolved.profiles.flight.bindings.canopy_open.actionKey, "canopy_open");
   assert.equal(resolved.profiles.flight.bindings.canopy_open.activationMode, "DOUBLE_TAP");
+  assert.deepEqual(resolved.profiles.flight.bindings.canopy_open.contextIds, ["global"]);
   assert.deepEqual(resolved.profiles.flight.bindings.canopy_open.slot, issue.binding.slot);
   assert.equal(resolved.profiles.flight.bindings.canopy_open.note, "ambiguous");
   assert.deepEqual(resolved.profiles.ground, migrated.profiles.ground);
@@ -212,6 +216,56 @@ function testConflictIdentity() {
   assert.equal(core.normalizeActivationMode("double_tap"), "DOUBLE_TAP");
 }
 
+function testContextRelationships() {
+  const catalog = core.DEFAULT_CONTEXT_CATALOG;
+  const slot = { slotType: "button", hand: "right", control: "TRG1", layer: "base" };
+  const base = {
+    actionKey: "weapon_fire",
+    canonicalActionKey: "weapon_fire",
+    slot,
+    activationMode: "DEFAULT",
+    contextIds: ["flight"],
+  };
+
+  assert.deepEqual(core.normalizeContextIds(undefined, catalog), ["global"]);
+  assert.deepEqual(core.normalizeContextIds(["mining", "mining", "unknown"], catalog), ["mining"]);
+  assert.deepEqual(core.normalizeContextIds(["mining", "global"], catalog), ["global"]);
+  assert.equal(core.areContextSetsExclusive(["mining"], ["salvage"], catalog), true);
+  assert.equal(core.areContextSetsExclusive(["global"], ["mining"], catalog), false);
+  assert.equal(core.areContextSetsExclusive(["mining", "salvage"], ["flight", "missile"], catalog), true);
+  assert.equal(core.areContextSetsExclusive(["mining", "salvage"], ["flight", "salvage"], catalog), false);
+
+  assert.equal(core.classifyBindingRelationship(base, {
+    ...base,
+    actionKey: "weapon_fire_alias",
+  }, catalog), "shared");
+  assert.equal(core.classifyBindingRelationship(base, {
+    ...base,
+    actionKey: "mining_fire",
+    canonicalActionKey: "mining_fire",
+    activationMode: "HOLD",
+    contextIds: ["mining"],
+  }, catalog), "activation-reuse");
+  assert.equal(core.classifyBindingRelationship(base, {
+    ...base,
+    actionKey: "mining_fire",
+    canonicalActionKey: "mining_fire",
+    contextIds: ["mining"],
+  }, catalog), "context-reuse");
+  assert.equal(core.classifyBindingRelationship({ ...base, contextIds: ["global"] }, {
+    ...base,
+    actionKey: "mining_fire",
+    canonicalActionKey: "mining_fire",
+    contextIds: ["mining"],
+  }, catalog), "true-conflict");
+  assert.equal(core.classifyBindingRelationship(base, {
+    ...base,
+    actionKey: "other",
+    canonicalActionKey: "other",
+    slot: { ...slot, control: "TRG2" },
+  }, catalog), "different-slot");
+}
+
 function testRealSeedInvariant() {
   global.window = {};
   require("../binding-planner/data.js");
@@ -229,11 +283,12 @@ function testRealSeedInvariant() {
   assert.equal(normalized.gameRows.filter((row) => /^\d+$/.test(String(row.activationMode))).length, 0);
 }
 
-assert.equal(core.WORKSPACE_SCHEMA_VERSION, 3);
+assert.equal(core.WORKSPACE_SCHEMA_VERSION, 4);
 testCatalogNormalization();
 testWorkspaceMigration();
 testRepairResolution();
 testConflictIdentity();
+testContextRelationships();
 testRealSeedInvariant();
 
 console.log("workspace repair verification passed");

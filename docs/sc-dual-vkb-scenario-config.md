@@ -1,6 +1,6 @@
 # SC Dual VKB 场景化配置说明
 
-本文基于当前 `binding-planner` 最新版本整理：配置器已经采用 v2 workspace 模型，默认提供 `Flight`、`Ground`、`Combat`、`Mining` 四个 Profile。本文说明配置意图和执行方法；完整动作矩阵以配置器中的 `场景清单` 和导出的 workspace JSON 为准。
+本文基于当前 `binding-planner` workspace v4 模型整理。新 workspace 只提供一个 `Default` Profile；完整动作矩阵以配置器中的 `场景清单` 和导出的 workspace JSON 为准。
 
 ## 1. 配置模型
 
@@ -9,23 +9,20 @@
 一个 workspace JSON 包含：
 
 - 全局 `deviceConfig`：左右杆设备 ID、按钮编号、Axis code、Shift offset。
-- 多个 Profile：每个 Profile 有独立 bindings、locks、notes。
+- 多个 Profile：每个 Profile 有独立 bindings、locks、notes、MODE 和 CTX。
 - UI 状态：当前 Profile、清单类型、筛选、是否显示编号等。
 
-原则：硬件编号是全局事实，不随 Profile 改变；动作绑定是场景策略，可以随 Profile 分化。
+原则：硬件编号是全局事实，不随 Profile 改变；Profile 是一整套设备、飞船或打法策略，不是当前正在运行的小场景。
 
 ### Profile
 
-默认 Profile：
+新 workspace 只有 `Default`。需要第二套完整方案时，再从当前 Profile 复制并按设备、飞船或打法命名，例如 `Dual VKB Heavy Fighter`；导入旧 workspace 时保留已有 Profile 名称和数据。
 
-| Profile | 用途 | 当前初始状态 |
-|---|---|---|
-| Flight | 主飞行、起降、MFD、基础战斗的综合基线 | 使用默认场景绑定 |
-| Ground | 地面或步行相关配置的分叉点 | 初始复制默认绑定 |
-| Combat | 高强度战斗配置的分叉点 | 初始复制默认绑定 |
-| Mining | 采矿/回收配置的分叉点 | 初始复制默认绑定 |
+### MODE 与 CTX
 
-建议流程：先把 `Flight` 调到可用并导出备份，再从当前 Profile 复制出 `Combat` / `Mining` 进行差异化调整。
+- `MODE` 表示同一物理键在游戏绑定层的触发方式；默认值叫 `DEFAULT`，其它模式可包括 Double Tap、Long Press、Short Press 等。
+- `CTX` 表示动作只在哪个游戏上下文生效；未设置时为 `GLOBAL`。只有明确互斥的 CTX 才能证明同槽位可复用。
+- 冲突身份由“物理槽位 + MODE”确定；MODE 不同天然共存，MODE 相同则继续依据动作身份和 CTX 判断。
 
 ## 2. 绑定语言
 
@@ -180,7 +177,7 @@
 
 ## 5. 刻意复用
 
-以下冲突/复用不是都要消除，其中一部分是基于模式上下文或游戏侧 Tap/Hold 的设计选择。
+同一物理槽位会显示三种关系：`共享` 表示同一 canonical action 出现在多个场景；`CTX 复用` 表示不同动作的 CTX 被证明互斥；`冲突` 表示同 MODE 下没有足够证据证明可共存。只有 `冲突` 会进入“问题”筛选并触发阻断、替换或“解绑其它”。
 
 | 物理位 | 复用动作 | 处理意图 |
 |---|---|---|
@@ -213,23 +210,23 @@
 
 ## 7. 实际配置流程
 
-1. 打开配置器，确认当前 Profile 是 `Flight`。
+1. 打开配置器，在 `Default` 或自己命名的完整策略 Profile 中工作。
 2. 打开 `#` 显示编号，核对左右杆按钮编号和 VKBDevCfg 输出一致。
 3. 从 `场景清单` 逐章检查；需要按游戏内顺序查找时切到 `游戏顺序`。
 4. 点选动作卡，再点左右摇杆上的目标物理键。
 5. 对确认不再调整的 6DOF 轴和核心动作使用锁定。
 6. 若需要解除绑定，点击动作卡上的 `CLR / ×` 解绑按钮；锁定状态下需先解锁。
-7. 用 `问题` 筛选检查冲突。对刻意复用保留；对非刻意冲突用 `解绑其它` 或手工重分配。
-8. 按场景复制 Profile：从 `Flight` 复制出 `Combat` / `Mining`，只调整该场景需要分化的复用点。
+7. 同槽位需要按游戏状态复用时，在动作卡的 `CTX` 中选择对应上下文；互斥关系成立后 mini-card 会显示 `CTX 复用`。
+8. 用 `问题` 筛选处理剩余真冲突；`共享` 和 `CTX 复用` 不会出现在这里。
 9. 导出 workspace JSON 作为完整备份；导入会覆盖当前 workspace，应先确认文件来源。
 
 ## 8. 验收清单
 
-- 6DOF 六轴在 `Flight` 中已锁定，且游戏内方向正确。
+- 6DOF 六轴在当前策略 Profile 中已锁定，且游戏内方向正确。
 - 左杆 `TRG1/TRG2` 分别是 Spacebrake / Boost。
 - 右杆 `TRG1/TRG2` 在战斗中能正确触发 WG1/WG2。
 - 导弹 Tap/Hold 由游戏侧正确区分。
 - Mining/Salvage 模式下右杆主触发和左 throttle 的复用符合预期。
-- `问题` 筛选中的复用项已逐条确认，不存在误占用。
+- `问题` 筛选中只剩需要处理的真冲突；合法 `共享` / `CTX 复用` 不在其中。
 - 高风险动作（弹射、自毁、自动降落）没有被随手放到易误触位置。
 - 导出的 workspace JSON 可以重新导入，并保留多 Profile、锁定、备注和全局设备编号。

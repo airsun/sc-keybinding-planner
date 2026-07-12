@@ -13,12 +13,7 @@
   const layerLabels = { base: "Base", shift1: "S1", shift2: "S2" };
   const handLabels = { left: "左杆", right: "右杆" };
   const maxProfileNameLength = 32;
-  const defaultProfileTemplates = [
-    { id: "flight", name: "Flight" },
-    { id: "ground", name: "Ground" },
-    { id: "combat", name: "Combat" },
-    { id: "mining", name: "Mining" },
-  ];
+  const defaultProfileTemplates = [{ id: "default", name: "Default" }];
 
   const dom = {
     leftPanel: document.getElementById("leftPanel"),
@@ -200,6 +195,7 @@
       updatedAt: timestamps.updatedAt || now,
       bindings: clone(bindings || {}),
       actionModes: clone(extras.actionModes || {}),
+      actionContexts: clone(extras.actionContexts || {}),
       repairQueue: clone(extras.repairQueue || []),
     };
   }
@@ -217,8 +213,9 @@
     const profiles = defaultProfiles();
     return normalizeWorkspace({
       schemaVersion: workspaceSchemaVersion,
-      activeProfileId: "flight",
+      activeProfileId: "default",
       deviceConfig: clone(seed.deviceConfig),
+      contextCatalog: clone(workspaceCore.DEFAULT_CONTEXT_CATALOG),
       profiles,
       uiSettings: clone(seed.uiSettings),
     });
@@ -245,7 +242,11 @@
       profile?.name || id,
       profile?.bindings || {},
       { createdAt: profile?.createdAt, updatedAt: profile?.updatedAt },
-      { actionModes: profile?.actionModes, repairQueue: profile?.repairQueue },
+      {
+        actionModes: profile?.actionModes,
+        actionContexts: profile?.actionContexts,
+        repairQueue: profile?.repairQueue,
+      },
     );
   }
 
@@ -265,6 +266,7 @@
       schemaVersion: workspaceSchemaVersion,
       activeProfileId,
       deviceConfig: data?.deviceConfig || clone(seed.deviceConfig),
+      contextCatalog: clone(data?.contextCatalog || workspaceCore.DEFAULT_CONTEXT_CATALOG),
       profiles,
       uiSettings: { ...seed.uiSettings, ...(data?.uiSettings || {}) },
     };
@@ -402,7 +404,7 @@
       lastSyncAt: new Date().toISOString(),
     });
     render();
-    notifyPendingRepairs("Workspace 已从远端迁移到 v3");
+    notifyPendingRepairs("Workspace 已从远端迁移到 v4");
   }
 
   function markSyncMetadata(remoteSha) {
@@ -425,7 +427,9 @@
     if (!state.profiles[state.activeProfileId]) {
       state.activeProfileId = Object.keys(state.profiles)[0];
     }
-    return state.profiles[state.activeProfileId];
+    const profile = state.profiles[state.activeProfileId];
+    profile.actionContexts = profile.actionContexts || {};
+    return profile;
   }
 
   function activeBindings() {
@@ -802,7 +806,11 @@
       name,
       source.bindings,
       {},
-      { actionModes: source.actionModes, repairQueue: source.repairQueue },
+      {
+        actionModes: source.actionModes,
+        actionContexts: source.actionContexts,
+        repairQueue: source.repairQueue,
+      },
     );
     state.activeProfileId = id;
     dom.profileDialog.close();
@@ -1005,6 +1013,35 @@
     );
   }
 
+  function contextIdsForRow(row) {
+    const profile = activeProfile();
+    return workspaceCore.normalizeContextIds(
+      bindingForRow(row)?.contextIds || profile.actionContexts[row.actionKey],
+      state.contextCatalog,
+    );
+  }
+
+  function setRowContexts(row, contextIds) {
+    const profile = activeProfile();
+    const binding = bindingForRow(row);
+    if (binding?.locked) {
+      showToast("这个绑定已锁定，先解除锁定再修改 CTX。", { tone: "warn" });
+      renderRows();
+      return false;
+    }
+    const normalized = workspaceCore.normalizeContextIds(contextIds, state.contextCatalog);
+    if (normalized.length === 1 && normalized[0] === workspaceCore.DEFAULT_CONTEXT_ID) {
+      delete profile.actionContexts[row.actionKey];
+    } else {
+      profile.actionContexts[row.actionKey] = clone(normalized);
+    }
+    if (binding) binding.contextIds = clone(normalized);
+    selectedRowId = row.id;
+    saveState();
+    render();
+    return true;
+  }
+
   function setRowActivationMode(row, value) {
     const profile = activeProfile();
     const binding = bindingForRow(row);
@@ -1037,6 +1074,52 @@
     return map;
   }
 
+  function canonicalActionKey(actionKey) {
+    const row = allRows().find((item) => item.actionKey === actionKey);
+    return row?.canonicalActionKey || row?.actionKey || actionKey;
+  }
+
+  function classifyBindings(left, right) {
+    return workspaceCore.classifyBindingRelationship(
+      { ...left, canonicalActionKey: canonicalActionKey(left.actionKey) },
+      { ...right, canonicalActionKey: canonicalActionKey(right.actionKey) },
+      state.contextCatalog,
+    );
+  }
+
+  function bindingsHaveTrueConflict(bindings) {
+    for (let leftIndex = 0; leftIndex < bindings.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < bindings.length; rightIndex += 1) {
+        if (classifyBindings(bindings[leftIndex], bindings[rightIndex]) === "true-conflict") return true;
+      }
+    }
+    return false;
+  }
+
+  function relatedBindingsFor(binding, occupancyMap = occupancy()) {
+    if (!binding?.slot) return [];
+    return (occupancyMap.get(bindingOccupancyKey(binding)) || [])
+      .filter((item) => item.actionKey !== binding.actionKey)
+      .map((item) => ({ binding: item, relationship: classifyBindings(binding, item) }));
+  }
+
+  function relationshipForRow(row, occupancyMap) {
+    const binding = bindingForRow(row);
+    if (!binding?.slot) return null;
+    const related = relatedBindingsFor(binding, occupancyMap);
+    const conflicts = related.filter((item) => item.relationship === "true-conflict");
+    if (conflicts.length) {
+      return { type: "true-conflict", relatedBindings: conflicts.map((item) => item.binding) };
+    }
+    const contextReuse = related.filter((item) => item.relationship === "context-reuse");
+    if (contextReuse.length) {
+      return { type: "context-reuse", relatedBindings: contextReuse.map((item) => item.binding) };
+    }
+    const sharedRows = seed.scenarioRows.filter((item) => item.actionKey === row.actionKey);
+    if (sharedRows.length > 1) return { type: "shared", referenceRows: sharedRows };
+    return null;
+  }
+
   function slotStatus(slot, occupancyMap) {
     const control = getControl(slot.hand, slot.control);
     const occupants = physicalOccupants(occupancyMap, slot);
@@ -1044,7 +1127,7 @@
     return {
       occupied: occupants.length > 0,
       locked: occupants.some((item) => item.locked),
-      conflict: occupants.length > 1,
+      conflict: bindingsHaveTrueConflict(occupants),
       uncalibrated: code === "--",
       current: selectedRowId ? occupants.some((item) => item.actionKey === findRow(selectedRowId)?.actionKey) : false,
       disabled: !control || control.bindable === false,
@@ -1054,10 +1137,37 @@
   function statusForRow(row, occupancyMap) {
     const binding = bindingForRow(row);
     if (!binding || !binding.slot) return { key: "unbound", label: "未分配", tone: "muted" };
-    const current = occupancyMap.get(bindingOccupancyKey(binding)) || [];
-    if (current.length > 1) return { key: "issue", reason: "conflict", label: "冲突", tone: "red", conflictCount: current.length };
+    const relationship = relationshipForRow(row, occupancyMap);
+    if (relationship?.type === "true-conflict") {
+      return {
+        key: "issue",
+        reason: "conflict",
+        label: "冲突",
+        tone: "red",
+        conflictCount: relationship.relatedBindings.length + 1,
+        relationship,
+      };
+    }
     if (codeForSlot(binding.slot) === "--") return { key: "issue", reason: "uncalibrated", label: "未校准", tone: "red" };
-    if (binding.locked) return { key: "locked", label: "已确认", tone: "green" };
+    if (relationship?.type === "context-reuse") {
+      return {
+        key: binding.locked ? "locked" : "bound",
+        reason: "context-reuse",
+        label: binding.locked ? "CTX 复用 · 已确认" : "CTX 复用",
+        tone: "cyan",
+        relationship,
+      };
+    }
+    if (relationship?.type === "shared") {
+      return {
+        key: binding.locked ? "locked" : "bound",
+        reason: "shared",
+        label: binding.locked ? "共享 · 已确认" : "共享",
+        tone: "green",
+        relationship,
+      };
+    }
+    if (binding.locked) return { key: "locked", label: "已确认", tone: "green", relationship };
     return { key: "bound", label: "已绑定", tone: "green" };
   }
 
@@ -1491,6 +1601,7 @@
     card.dataset.rowId = row.id;
     if (row.id === selectedRowId) card.classList.add("selected");
     if (binding?.locked) card.classList.add("locked-card");
+    if (status.relationship) card.classList.add("has-relationship");
     if (status.reason === "conflict") card.classList.add("has-conflict");
     card.addEventListener("click", () => focusBinding(row));
 
@@ -1503,7 +1614,9 @@
     actionCell.append(titleRow);
     if (secondary) actionCell.append(makeEl("div", "action-sub", secondary));
     if (row.subgroup) actionCell.append(makeEl("div", "action-sub", row.subgroup));
-    actionCell.append(renderActivationModeSelect(row));
+    const configRow = makeEl("div", "action-config-row");
+    configRow.append(renderActivationModeSelect(row), renderContextPicker(row));
+    actionCell.append(configRow);
 
     const desc = makeEl("div", "card-description");
     desc.append(makeEl("span", "card-description-text", row.description || row.actionText || row.suggestedInput || "—"));
@@ -1516,14 +1629,14 @@
 
   function renderBindingConsole(row, binding, status) {
     const consoleEl = makeEl("div", "binding-console");
-    if (binding?.slot && status.reason === "conflict") consoleEl.classList.add("has-conflict");
+    if (binding?.slot && status.relationship) consoleEl.classList.add("has-conflict", "has-relationship");
     const statusRail = makeEl("div", `status-rail ${status.tone || "muted"}`.trim());
     statusRail.title = status.label;
     if (binding?.note) statusRail.classList.add("noted");
     consoleEl.append(statusRail);
 
-    if (binding?.slot && status.reason === "conflict") {
-      consoleEl.append(renderConflictMiniCard(binding, status));
+    if (binding?.slot && status.relationship) {
+      consoleEl.append(renderRelationshipMiniCard(row, binding, status));
     }
 
     const controls = makeEl("div", "binding-controls");
@@ -1558,40 +1671,156 @@
     return wrap;
   }
 
-  function renderConflictMiniCard(binding, status) {
+  function contextEntries() {
+    return Object.values(state.contextCatalog || workspaceCore.DEFAULT_CONTEXT_CATALOG);
+  }
+
+  function contextLabels(contextIds) {
+    return workspaceCore.normalizeContextIds(contextIds, state.contextCatalog)
+      .map((id) => state.contextCatalog[id]?.label || id);
+  }
+
+  function contextSummary(row) {
+    const labels = contextLabels(contextIdsForRow(row));
+    if (labels.length <= 2) return labels.join(" + ");
+    return `${labels.length} CTX`;
+  }
+
+  function renderContextPicker(row) {
+    const picker = makeEl("div", "context-picker");
+    picker.addEventListener("click", (event) => event.stopPropagation());
+    picker.append(makeEl("span", "context-picker-label", "CTX"));
+    const button = makeEl("button", "context-picker-button", contextSummary(row));
+    button.type = "button";
+    button.setAttribute("aria-label", `${row.nameZh || row.nameEn || row.actionKey} CTX`);
+    button.setAttribute("aria-expanded", "false");
+
+    const panel = makeEl("div", "context-picker-panel");
+    const selected = new Set(contextIdsForRow(row));
+    for (const entry of contextEntries()) {
+      const label = makeEl("label", "context-option");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = entry.id;
+      checkbox.checked = selected.has(entry.id);
+      checkbox.addEventListener("change", () => {
+        const checkboxes = Array.from(panel.querySelectorAll('input[type="checkbox"]'));
+        if (checkbox.checked && checkbox.value === workspaceCore.DEFAULT_CONTEXT_ID) {
+          for (const item of checkboxes) item.checked = item === checkbox;
+        } else if (checkbox.checked) {
+          const global = checkboxes.find((item) => item.value === workspaceCore.DEFAULT_CONTEXT_ID);
+          if (global) global.checked = false;
+        }
+      });
+      const copy = makeEl("span", "context-option-copy");
+      copy.append(makeEl("strong", "", entry.label));
+      if (entry.exclusiveGroup) copy.append(makeEl("small", "", entry.exclusiveGroup));
+      label.append(checkbox, copy);
+      panel.append(label);
+    }
+
+    const actions = makeEl("div", "context-picker-actions");
+    const close = makeEl("button", "", "关闭");
+    close.type = "button";
+    close.addEventListener("click", () => {
+      picker.classList.remove("open");
+      button.setAttribute("aria-expanded", "false");
+    });
+    const apply = makeEl("button", "primary", "应用");
+    apply.type = "button";
+    apply.addEventListener("click", () => {
+      const contextIds = Array.from(panel.querySelectorAll('input[type="checkbox"]:checked'))
+        .map((input) => input.value);
+      setRowContexts(row, contextIds);
+    });
+    actions.append(close, apply);
+    panel.append(actions);
+
+    button.addEventListener("click", () => {
+      const isOpen = picker.classList.toggle("open");
+      button.setAttribute("aria-expanded", String(isOpen));
+    });
+    picker.append(button, panel);
+    return picker;
+  }
+
+  function openContextPickerForRow(rowId) {
+    const card = dom.rows.querySelector(`[data-row-id="${rowId}"]`);
+    card?.querySelector(".context-picker-button")?.click();
+  }
+
+  function renderRelationshipMiniCard(row, binding, status) {
     const slot = binding.slot;
-    const conflicts = conflictingBindingsFor(binding);
-    const removable = conflicts.filter((item) => !item.locked);
-    const locked = conflicts.filter((item) => item.locked);
-    const card = makeEl("div", "conflict-mini-card");
-    card.title = conflicts.length
-      ? `冲突：${conflicts.map((item) => displayNameForAction(item.actionKey)).join("、")}`
-      : "当前键位被多个动作占用";
+    const relationship = status.relationship;
+    const related = relationship.relatedBindings || [];
+    const removable = related.filter((item) => !item.locked);
+    const locked = related.filter((item) => item.locked);
+    const type = relationship.type;
+    const labels = {
+      shared: "共享",
+      "context-reuse": "CTX 复用",
+      "true-conflict": "冲突",
+    };
+    const count = type === "shared" ? relationship.referenceRows.length : related.length + 1;
+    const card = makeEl("div", `conflict-mini-card relationship-${type}`);
+    card.title = type === "shared"
+      ? `共享场景：${relationship.referenceRows.map((item) => item.group).join("、")}`
+      : `${labels[type]}：${related.map((item) => displayNameForAction(item.actionKey)).join("、")}`;
     const meta = makeEl("div", "conflict-mini-meta");
     const side = handLabels[slot.hand] || slot.hand;
     const layer = slot.slotType === "axis" ? "Axis" : layerLabels[slot.layer || "base"];
-    meta.append(makeEl("span", "conflict-mini-tag", "冲突键位"));
-    meta.append(makeEl("span", "conflict-mini-count", `x${status.conflictCount || 2}`));
+    meta.append(makeEl("span", "conflict-mini-tag", labels[type]));
+    meta.append(makeEl("span", "conflict-mini-count", `x${count}`));
     const main = makeEl("div", "conflict-mini-main", slotLabel(slot));
-    const code = makeEl("div", "conflict-mini-code", `${side} · ${layer} · ${state.uiSettings.showCodes ? compactCodeForSlot(slot) : codeForSlot(slot)}`);
-    const action = makeEl("button", "conflict-mini-action", removable.length ? "解绑其它" : "锁定中");
-    action.type = "button";
-    action.disabled = !removable.length;
-    action.title = removable.length
-      ? `解绑 ${removable.length} 个未锁定冲突绑定`
-      : "其它冲突绑定已锁定，需先解除锁定";
-    if (locked.length) action.classList.add("has-locked");
-    action.addEventListener("click", (event) => {
-      event.stopPropagation();
-      resolveBindingConflict(binding);
-    });
-    card.append(meta, main, code, action);
+    const evidence = type === "shared"
+      ? relationship.referenceRows.map((item) => item.group.replace(/^第\s*/, "")).join(" / ")
+      : related.map((item) => `${displayNameForAction(item.actionKey)} · ${contextLabels(item.contextIds).join("+")}`).join(" / ");
+    const code = makeEl(
+      "div",
+      "conflict-mini-code",
+      `${side} · ${layer} · ${state.uiSettings.showCodes ? compactCodeForSlot(slot) : codeForSlot(slot)}${evidence ? ` · ${evidence}` : ""}`,
+    );
+    const actions = makeEl("div", "conflict-mini-actions");
+    if (type === "shared") {
+      const inspect = makeEl("button", "conflict-mini-action", "查看来源");
+      inspect.type = "button";
+      inspect.addEventListener("click", (event) => {
+        event.stopPropagation();
+        showToast(relationship.referenceRows.map((item) => `${item.group} · ${item.nameZh || item.nameEn}`).join("；"), { duration: 6200 });
+      });
+      actions.append(inspect);
+    } else {
+      const edit = makeEl("button", "conflict-mini-action", "编辑 CTX");
+      edit.type = "button";
+      edit.addEventListener("click", (event) => {
+        event.stopPropagation();
+        openContextPickerForRow(row.id);
+      });
+      actions.append(edit);
+      if (type === "true-conflict") {
+        const unbind = makeEl("button", "conflict-mini-action danger", removable.length ? "解绑其它" : "锁定中");
+        unbind.type = "button";
+        unbind.disabled = !removable.length;
+        unbind.title = removable.length
+          ? `解绑 ${removable.length} 个未锁定冲突 binding`
+          : "其它冲突 binding 已锁定，需先解除锁定";
+        if (locked.length) unbind.classList.add("has-locked");
+        unbind.addEventListener("click", (event) => {
+          event.stopPropagation();
+          resolveBindingConflict(binding);
+        });
+        actions.append(unbind);
+      }
+    }
+    card.append(meta, main, code, actions);
     return card;
   }
 
   function conflictingBindingsFor(binding) {
     if (!binding?.slot) return [];
-    return (occupancy().get(bindingOccupancyKey(binding)) || []).filter((item) => item.actionKey !== binding.actionKey);
+    return relatedBindingsFor(binding)
+      .filter((item) => item.relationship === "true-conflict")
+      .map((item) => item.binding);
   }
 
   function resolveBindingConflict(binding) {
@@ -1900,8 +2129,16 @@
 
     const activationMode = activationModeForRow(row);
     const occ = occupancy();
-    const occupants = (occ.get(bindingOccupancyKey({ slot, activationMode })) || [])
-      .filter((item) => item.actionKey !== row.actionKey);
+    const candidate = {
+      actionKey: row.actionKey,
+      canonicalActionKey: row.canonicalActionKey || row.actionKey,
+      slot,
+      activationMode,
+      contextIds: contextIdsForRow(row),
+    };
+    const occupants = (occ.get(bindingOccupancyKey(candidate)) || [])
+      .filter((item) => item.actionKey !== row.actionKey)
+      .filter((item) => classifyBindings(candidate, item) === "true-conflict");
     if (occupants.some((item) => item.locked)) {
       showToast("这个键位已经锁定，先解除锁定再修改。", { tone: "warn" });
       return false;
@@ -1927,6 +2164,7 @@
       actionKey: row.actionKey,
       slot,
       activationMode,
+      contextIds: candidate.contextIds,
       enabled: true,
       locked: existing?.locked || false,
       note: existing?.note || "",
@@ -2246,7 +2484,7 @@
             saveState();
             render();
             if (pendingRepairItems().length) {
-              notifyPendingRepairs("Workspace 已导入并迁移到 v3");
+              notifyPendingRepairs("Workspace 已导入并迁移到 v4");
             } else {
               showToast("Workspace 已导入。", { tone: "info" });
             }
@@ -2396,5 +2634,5 @@
   const initialRow = selectedRowId ? findRow(selectedRowId) : null;
   if (initialRow && !bindingForRow(initialRow)) clearPendingTarget();
   render();
-  notifyPendingRepairs("本地 Workspace 已迁移到 v3");
+  notifyPendingRepairs("本地 Workspace 已迁移到 v4");
 })();

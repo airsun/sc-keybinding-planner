@@ -19,6 +19,204 @@
   font-family: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* Schema v4 CTX controls and relationship mini-card states. */
+.binding-card.has-relationship {
+  grid-template-columns: minmax(72px, 1fr) 570px;
+}
+
+.action-config-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 6px;
+  width: min(100%, 300px);
+  margin-top: 5px;
+}
+
+.action-config-row .activation-mode-field {
+  width: 100%;
+  margin-top: 0;
+}
+
+.context-picker {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.context-picker-label {
+  color: var(--muted);
+  font: 700 9px/1 var(--mono);
+}
+
+.context-picker-button {
+  min-width: 0;
+  height: 22px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--text);
+  background: #07100b;
+  padding: 0 6px;
+  font: 10px/1 var(--mono);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-picker-button::after {
+  content: "▾";
+  float: right;
+  color: var(--line-hot);
+}
+
+.context-picker-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  display: none;
+  width: min(270px, calc(100vw - 32px));
+  max-height: 310px;
+  overflow: auto;
+  border: 1px solid var(--line-hot);
+  background: rgba(3, 9, 5, 0.98);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.58);
+  padding: 7px;
+}
+
+.context-picker.open .context-picker-panel {
+  display: grid;
+  gap: 3px;
+}
+
+.context-option {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 4px 5px;
+  border: 1px solid transparent;
+  color: var(--text);
+  background: rgba(145, 178, 138, 0.035);
+}
+
+.context-option:hover {
+  border-color: var(--line);
+}
+
+.context-option input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--amber);
+}
+
+.context-option-copy {
+  display: grid;
+  min-width: 0;
+  font: 10px/1.2 var(--mono);
+}
+
+.context-option-copy small {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.context-picker-actions {
+  position: sticky;
+  bottom: -7px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+  margin: 5px -7px -7px;
+  padding: 7px;
+  border-top: 1px solid var(--line);
+  background: #030905;
+}
+
+.context-picker-actions button {
+  min-height: 26px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  background: #08110c;
+  font: 10px/1 var(--mono);
+}
+
+.context-picker-actions button.primary {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.status-rail.cyan {
+  background:
+    repeating-linear-gradient(180deg, rgba(205, 255, 252, 0.24) 0 3px, transparent 3px 5px),
+    linear-gradient(180deg, rgba(91, 214, 208, 0.95), rgba(91, 214, 208, 0.22));
+  box-shadow: 0 0 8px rgba(91, 214, 208, 0.28);
+}
+
+.slot-pill.cyan {
+  border-color: rgba(91, 214, 208, 0.58);
+}
+
+.conflict-mini-card.relationship-shared {
+  border-color: rgba(102, 212, 126, 0.58);
+  border-left-color: var(--green);
+  background: linear-gradient(90deg, rgba(102, 212, 126, 0.12), transparent 68%), rgba(2, 8, 4, 0.78);
+}
+
+.conflict-mini-card.relationship-context-reuse {
+  border-color: rgba(91, 214, 208, 0.62);
+  border-left-color: var(--line-hot);
+  background: linear-gradient(90deg, rgba(91, 214, 208, 0.12), transparent 68%), rgba(2, 8, 8, 0.78);
+}
+
+.relationship-shared .conflict-mini-meta {
+  color: var(--green);
+}
+
+.relationship-context-reuse .conflict-mini-meta {
+  color: var(--line-hot);
+}
+
+.conflict-mini-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.conflict-mini-actions:has(> :only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.conflict-mini-action.danger {
+  border-color: rgba(255, 93, 77, 0.52);
+  color: var(--red);
+}
+
+@media (max-width: 680px) {
+  .binding-card.has-relationship {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .action-config-row {
+    width: 100%;
+  }
+
+  .context-picker-panel {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+    max-height: none;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1628,10 +1826,13 @@ body {
 }
 
 .conflict-mini-code {
+  min-width: 0;
+  overflow: hidden;
   color: var(--line-hot);
   font-family: var(--mono);
   font-size: 9px;
   line-height: 1;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

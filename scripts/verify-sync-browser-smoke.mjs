@@ -135,9 +135,9 @@ function smokeInjectSource() {
   window.__syncSmokeImportCorrupt = () => {
     const workspace = activeWorkspace();
     workspace.schemaVersion = 2;
-    workspace.activeProfileId = "flight";
-    workspace.profiles.flight.repairQueue = [];
-    workspace.profiles.flight.bindings["1372"] = {
+    workspace.activeProfileId = "default";
+    workspace.profiles.default.repairQueue = [];
+    workspace.profiles.default.bindings["1372"] = {
       actionKey: "1372",
       slot: { slotType: "button", hand: "right", control: "A3_left", layer: "base" },
       enabled: true,
@@ -162,13 +162,13 @@ function smokeInjectSource() {
 
 async function serveSmokeHtml() {
   const original = await readFile(path.join(appRoot, "index.html"), "utf8");
-  const needle = '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="./app.js?v=retro-39"></script>';
+  const needle = '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="./app.js?v=retro-40"></script>';
   if (!original.includes(needle)) {
     throw new Error("Unable to find sync-core/app.js script boundary in index.html");
   }
   return original.replace(
     needle,
-    '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="/__sync-smoke-inject.js"></script>\n    <script src="./app.js?v=retro-39"></script>',
+    '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="/__sync-smoke-inject.js"></script>\n    <script src="./app.js?v=retro-40"></script>',
   );
 }
 
@@ -348,8 +348,19 @@ function pageExpression() {
       repairDialogOpen: $("#repairDialog").open,
       repairCandidateCount: $("#repairTargetSelect").options.length,
       modeSelectCount: document.querySelectorAll(".activation-mode-select").length,
+      contextControlCount: document.querySelectorAll(".context-picker-button").length,
+      defaultActionContexts: workspace.profiles?.default?.actionContexts || {},
+      rowRelationships: {
+        scenario1: document.querySelector('[data-row-id="scenario-1"] .conflict-mini-tag')?.textContent || "",
+        scenario8: document.querySelector('[data-row-id="scenario-8"] .conflict-mini-tag')?.textContent || "",
+        scenario69: document.querySelector('[data-row-id="scenario-69"] .conflict-mini-tag')?.textContent || "",
+      },
+      rowConflicts: {
+        scenario1: document.querySelector('[data-row-id="scenario-1"]')?.classList.contains("has-conflict") || false,
+        scenario69: document.querySelector('[data-row-id="scenario-69"]')?.classList.contains("has-conflict") || false,
+      },
       repairTargetBinding: window.__repairSmokeTarget
-        ? workspace.profiles?.flight?.bindings?.[window.__repairSmokeTarget] || null
+        ? workspace.profiles?.default?.bindings?.[window.__repairSmokeTarget] || null
         : null,
       selectedRowId: workspace.uiSettings?.selectedRowId || "",
       showCodes: Boolean(workspace.uiSettings?.showCodes),
@@ -361,6 +372,10 @@ function pageExpression() {
       status: $("#syncStatus").textContent || "",
       toasts: Array.from(document.querySelectorAll(".toast-message")).map((node) => node.textContent || ""),
       profileValue: $("#profileSelect").value || "",
+      profileOptions: Array.from($("#profileSelect").options).map((option) => ({
+        value: option.value,
+        label: option.textContent || "",
+      })),
       remoteSha: window.__syncSmoke.remoteSha,
       writeCount: window.__syncSmoke.writeCount,
     };
@@ -374,6 +389,24 @@ function pageExpression() {
       await sleep(50);
     }
     throw new Error(\`\${label} timed out with state \${JSON.stringify(current)}\`);
+  };
+  const createProfile = async (name, expectedId) => {
+    click("#profileAddBtn");
+    fill("#profileNewName", name);
+    click("#profileCreateBtn");
+    await waitFor(
+      (current) => current.activeProfileId === expectedId && current.profileValue === expectedId,
+      "create profile " + expectedId,
+    );
+  };
+  const setRowContext = async (rowId, actionKey, contextId) => {
+    click(\`[data-row-id="\${rowId}"] .context-picker-button\`);
+    setChecked(\`[data-row-id="\${rowId}"] .context-option input[value="\${contextId}"]\`, true);
+    click(\`[data-row-id="\${rowId}"] .context-picker-actions .primary\`);
+    await waitFor(
+      (current) => current.defaultActionContexts[actionKey]?.includes(contextId),
+      \`set context \${contextId} on \${rowId}\`,
+    );
   };
   const record = (step) => {
     const current = state();
@@ -393,6 +426,37 @@ function pageExpression() {
   };
 
   if (state().modeSelectCount === 0) throw new Error("Per-action activation mode controls are missing");
+  if (state().contextControlCount === 0) throw new Error("Per-action CTX controls are missing");
+  if (JSON.stringify(state().profileOptions) !== JSON.stringify([{ value: "default", label: "Default" }])) {
+    throw new Error("New workspace must start with one Default Profile: " + JSON.stringify(state().profileOptions));
+  }
+  if (state().rowRelationships.scenario1 !== "冲突") {
+    throw new Error("Expected initial same-slot conflict for scenario-1: " + JSON.stringify(state().rowRelationships));
+  }
+  if (state().rowRelationships.scenario8 !== "共享") {
+    throw new Error("Expected shared action relationship for scenario-8: " + JSON.stringify(state().rowRelationships));
+  }
+
+  await setRowContext("scenario-1", "pc_interaction_select", "interaction");
+  await setRowContext("scenario-69", "v_mfd_soft_select_mfd_primary_short", "mfd");
+  await waitFor(
+    (current) => current.rowRelationships.scenario1 === "CTX 复用"
+      && current.rowRelationships.scenario69 === "CTX 复用"
+      && !current.rowConflicts.scenario1
+      && !current.rowConflicts.scenario69,
+    "mutually exclusive CTX reuse",
+  );
+  click('[data-filter="issue"]');
+  if (document.querySelector('[data-row-id="scenario-1"]') || document.querySelector('[data-row-id="scenario-69"]')) {
+    throw new Error("CTX reuse must not appear in the problem filter");
+  }
+  click('[data-filter="all"]');
+  await waitFor((current) => current.rowRelationships.scenario1 === "CTX 复用", "restore all filter");
+  record("mutually exclusive contexts reuse one slot");
+
+  await createProfile("Ground", "ground");
+  await createProfile("Combat", "combat");
+  await createProfile("Mining", "mining");
 
   select("#profileSelect", "ground");
   await waitFor((current) => current.activeProfileId === "ground" && current.profileValue === "ground", "local profile switch persist");
@@ -462,7 +526,7 @@ function pageExpression() {
   await waitFor((current) => current.toasts.some((text) => text.includes("导入会覆盖")), "corrupt import confirmation");
   primaryToast();
   await waitFor(
-    (current) => current.schemaVersion === 3 && current.repairCount === 1 && !current.hasNumericBinding && current.repairButtonVisible,
+    (current) => current.schemaVersion === 4 && current.repairCount === 1 && !current.hasNumericBinding && current.repairButtonVisible,
     "corrupt binding quarantine",
   );
   record("v2 numeric binding quarantined");

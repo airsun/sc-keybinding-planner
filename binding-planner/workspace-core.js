@@ -5,8 +5,21 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function createWorkspaceCore() {
   "use strict";
 
-  const WORKSPACE_SCHEMA_VERSION = 3;
+  const WORKSPACE_SCHEMA_VERSION = 4;
   const DEFAULT_ACTIVATION_MODE = "DEFAULT";
+  const DEFAULT_CONTEXT_ID = "global";
+  const DEFAULT_CONTEXT_CATALOG = Object.freeze({
+    global: { id: "global", label: "GLOBAL", exclusiveGroup: "" },
+    "on-foot": { id: "on-foot", label: "On Foot", exclusiveGroup: "control-domain" },
+    vehicle: { id: "vehicle", label: "Vehicle", exclusiveGroup: "control-domain" },
+    interaction: { id: "interaction", label: "Interaction", exclusiveGroup: "interaction-layer" },
+    mfd: { id: "mfd", label: "MFD", exclusiveGroup: "interaction-layer" },
+    flight: { id: "flight", label: "Flight", exclusiveGroup: "operator-mode" },
+    missile: { id: "missile", label: "Missile", exclusiveGroup: "operator-mode" },
+    mining: { id: "mining", label: "Mining", exclusiveGroup: "operator-mode" },
+    salvage: { id: "salvage", label: "Salvage", exclusiveGroup: "operator-mode" },
+    turret: { id: "turret", label: "Turret", exclusiveGroup: "operator-mode" },
+  });
   const CORRUPT_ACTION_KEYS = new Set(["1372"]);
 
   function clone(value) {
@@ -32,6 +45,49 @@
     const text = cleanText(value);
     if (!text || isNumericPlaceholder(text)) return DEFAULT_ACTIVATION_MODE;
     return text.toUpperCase().replace(/[\s-]+/g, "_");
+  }
+
+  function normalizeContextCatalog(value) {
+    const result = clone(DEFAULT_CONTEXT_CATALOG);
+    for (const [key, entry] of Object.entries(value || {})) {
+      const id = cleanText(entry?.id || key).toLowerCase();
+      if (!id) continue;
+      result[id] = {
+        id,
+        label: cleanText(entry?.label) || id,
+        exclusiveGroup: cleanText(entry?.exclusiveGroup),
+      };
+    }
+    return result;
+  }
+
+  function normalizeContextIds(value, catalog = DEFAULT_CONTEXT_CATALOG) {
+    const normalizedCatalog = normalizeContextCatalog(catalog);
+    const source = Array.isArray(value) ? value : value ? [value] : [];
+    const result = [];
+    for (const item of source) {
+      const id = cleanText(item).toLowerCase();
+      if (!normalizedCatalog[id] || result.includes(id)) continue;
+      result.push(id);
+    }
+    if (!result.length || result.includes(DEFAULT_CONTEXT_ID)) return [DEFAULT_CONTEXT_ID];
+    return result;
+  }
+
+  function areContextSetsExclusive(left, right, catalog = DEFAULT_CONTEXT_CATALOG) {
+    const normalizedCatalog = normalizeContextCatalog(catalog);
+    const leftIds = normalizeContextIds(left, normalizedCatalog);
+    const rightIds = normalizeContextIds(right, normalizedCatalog);
+    if (leftIds.includes(DEFAULT_CONTEXT_ID) || rightIds.includes(DEFAULT_CONTEXT_ID)) return false;
+    return leftIds.every((leftId) => rightIds.every((rightId) => {
+      const leftEntry = normalizedCatalog[leftId];
+      const rightEntry = normalizedCatalog[rightId];
+      return Boolean(
+        leftId !== rightId &&
+        leftEntry?.exclusiveGroup &&
+        leftEntry.exclusiveGroup === rightEntry?.exclusiveGroup,
+      );
+    }));
   }
 
   function slug(value) {
@@ -75,7 +131,7 @@
     });
   }
 
-  function normalizeBinding(binding, fallbackActionKeyValue) {
+  function normalizeBinding(binding, fallbackActionKeyValue, catalog = DEFAULT_CONTEXT_CATALOG) {
     const next = clone(binding) || {};
     const requestedKey = cleanText(next.actionKey || fallbackActionKeyValue);
     if (!isValidActionKey(requestedKey)) return null;
@@ -83,18 +139,19 @@
       ...next,
       actionKey: requestedKey,
       activationMode: normalizeActivationMode(next.activationMode),
+      contextIds: normalizeContextIds(next.contextIds, catalog),
     };
   }
 
-  function normalizeDefaultBindings(bindings) {
+  function normalizeDefaultBindings(bindings, catalog = DEFAULT_CONTEXT_CATALOG) {
     if (Array.isArray(bindings)) {
       return bindings
-        .map((binding) => normalizeBinding(binding, binding?.actionKey))
+        .map((binding) => normalizeBinding(binding, binding?.actionKey, catalog))
         .filter(Boolean);
     }
     const result = {};
     for (const [key, binding] of Object.entries(bindings || {})) {
-      const normalized = normalizeBinding(binding, key);
+      const normalized = normalizeBinding(binding, key, catalog);
       if (normalized) result[normalized.actionKey] = normalized;
     }
     return result;
@@ -106,7 +163,7 @@
       ...seed,
       gameRows: normalizeRows(seed.gameRows, "game"),
       scenarioRows: normalizeRows(seed.scenarioRows, "scenario"),
-      defaultBindings: normalizeDefaultBindings(seed.defaultBindings),
+      defaultBindings: normalizeDefaultBindings(seed.defaultBindings, DEFAULT_CONTEXT_CATALOG),
     };
   }
 
@@ -143,7 +200,19 @@
     return result;
   }
 
-  function normalizeProfile(profile, fallbackId) {
+  function normalizeActionContexts(actionContexts, catalog) {
+    const result = {};
+    for (const [actionKey, contextIds] of Object.entries(actionContexts || {})) {
+      if (!isValidActionKey(actionKey)) continue;
+      const normalized = normalizeContextIds(contextIds, catalog);
+      if (!(normalized.length === 1 && normalized[0] === DEFAULT_CONTEXT_ID)) {
+        result[actionKey] = normalized;
+      }
+    }
+    return result;
+  }
+
+  function normalizeProfile(profile, fallbackId, catalog) {
     const next = clone(profile) || {};
     const bindings = {};
     const repairQueue = normalizeRepairQueue(next.repairQueue);
@@ -160,7 +229,7 @@
         }
         continue;
       }
-      const normalized = normalizeBinding(binding, key);
+      const normalized = normalizeBinding(binding, key, catalog);
       if (normalized) bindings[normalized.actionKey] = normalized;
     }
 
@@ -170,6 +239,7 @@
       bindings,
       repairQueue,
       actionModes: normalizeActionModes(next.actionModes),
+      actionContexts: normalizeActionContexts(next.actionContexts, catalog),
     };
   }
 
@@ -194,13 +264,14 @@
 
     const source = clone(sourceWorkspace);
     const schemaVersion = Number(source.schemaVersion);
-    if (![1, 2, WORKSPACE_SCHEMA_VERSION].includes(schemaVersion)) {
+    if (![1, 2, 3, WORKSPACE_SCHEMA_VERSION].includes(schemaVersion)) {
       throw new TypeError(`Unsupported workspace schema: ${source.schemaVersion ?? "missing"}.`);
     }
+    const contextCatalog = normalizeContextCatalog(source.contextCatalog);
     const profilesSource = legacyProfiles(source);
     const profiles = {};
     for (const [key, profile] of Object.entries(profilesSource)) {
-      const normalized = normalizeProfile(profile, key);
+      const normalized = normalizeProfile(profile, key, contextCatalog);
       if (normalized.id) profiles[normalized.id] = normalized;
     }
     if (Object.keys(profiles).length === 0) {
@@ -217,6 +288,7 @@
       schemaVersion: WORKSPACE_SCHEMA_VERSION,
       activeProfileId,
       profiles,
+      contextCatalog,
     };
     delete result.bindings;
     return result;
@@ -251,12 +323,22 @@
       ...clone(issue.binding),
       actionKey,
       activationMode: normalizeActivationMode(options?.activationMode),
+      contextIds: normalizeContextIds(
+        options?.contextIds || profile.actionContexts[actionKey] || issue.binding?.contextIds,
+        workspace.contextCatalog,
+      ),
     };
     const activationMode = profile.bindings[actionKey].activationMode;
     if (activationMode === DEFAULT_ACTIVATION_MODE) {
       delete profile.actionModes[actionKey];
     } else {
       profile.actionModes[actionKey] = activationMode;
+    }
+    const contextIds = profile.bindings[actionKey].contextIds;
+    if (contextIds.length === 1 && contextIds[0] === DEFAULT_CONTEXT_ID) {
+      delete profile.actionContexts[actionKey];
+    } else {
+      profile.actionContexts[actionKey] = clone(contextIds);
     }
     profile.repairQueue.splice(issueIndex, 1);
     return workspace;
@@ -273,13 +355,32 @@
     return `${physicalSlotKey(binding?.slot)}:${normalizeActivationMode(binding?.activationMode)}`;
   }
 
+  function classifyBindingRelationship(left, right, catalog = DEFAULT_CONTEXT_CATALOG) {
+    if (!left?.slot || !right?.slot || physicalSlotKey(left.slot) !== physicalSlotKey(right.slot)) {
+      return "different-slot";
+    }
+    if (normalizeActivationMode(left.activationMode) !== normalizeActivationMode(right.activationMode)) {
+      return "activation-reuse";
+    }
+    const leftCanonicalKey = cleanText(left.canonicalActionKey || left.actionKey);
+    const rightCanonicalKey = cleanText(right.canonicalActionKey || right.actionKey);
+    if (leftCanonicalKey && leftCanonicalKey === rightCanonicalKey) return "shared";
+    if (areContextSetsExclusive(left.contextIds, right.contextIds, catalog)) return "context-reuse";
+    return "true-conflict";
+  }
+
   return Object.freeze({
     WORKSPACE_SCHEMA_VERSION,
     DEFAULT_ACTIVATION_MODE,
+    DEFAULT_CONTEXT_CATALOG,
+    DEFAULT_CONTEXT_ID,
+    areContextSetsExclusive,
     bindingConflictKey,
+    classifyBindingRelationship,
     isNumericPlaceholder,
     migrateWorkspace,
     normalizeActivationMode,
+    normalizeContextIds,
     normalizeSeed,
     physicalSlotKey,
     resolveRepairItem,

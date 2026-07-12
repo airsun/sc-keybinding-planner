@@ -22,6 +22,8 @@ if (!sourceArg || !repairedArg) {
   assert.deepEqual(repaired.deviceConfig, source.deviceConfig);
   assert.deepEqual(repaired.uiSettings, source.uiSettings);
   assert.deepEqual(Object.keys(repaired.profiles), Object.keys(source.profiles));
+  assert.equal(repaired.contextCatalog.global.label, "GLOBAL");
+  assert.equal(repaired.contextCatalog.mining.exclusiveGroup, "operator-mode");
 
   let activeBindings = 0;
   let repairItems = 0;
@@ -31,6 +33,14 @@ if (!sourceArg || !repairedArg) {
     assert.equal(repairedProfile.name, sourceProfile.name);
     assert.equal(repairedProfile.createdAt, sourceProfile.createdAt);
     assert.equal(repairedProfile.updatedAt, sourceProfile.updatedAt);
+    const expectedActionContexts = {};
+    for (const [actionKey, contextIds] of Object.entries(sourceProfile.actionContexts || {})) {
+      const normalized = core.normalizeContextIds(contextIds, repaired.contextCatalog);
+      if (!(normalized.length === 1 && normalized[0] === core.DEFAULT_CONTEXT_ID)) {
+        expectedActionContexts[actionKey] = normalized;
+      }
+    }
+    assert.deepEqual(repairedProfile.actionContexts, expectedActionContexts);
 
     const expectedRepairCount = Object.hasOwn(sourceProfile.bindings, "1372") ? 1 : 0;
     assert.equal(repairedProfile.repairQueue.length, expectedRepairCount);
@@ -47,6 +57,7 @@ if (!sourceArg || !repairedArg) {
       assert.deepEqual(repairedProfile.bindings[actionKey], {
         ...binding,
         activationMode: core.normalizeActivationMode(binding.activationMode),
+        contextIds: core.normalizeContextIds(binding.contextIds, repaired.contextCatalog),
       });
     }
 
