@@ -169,13 +169,13 @@ function smokeInjectSource() {
 
 async function serveSmokeHtml() {
   const original = await readFile(path.join(appRoot, "index.html"), "utf8");
-  const needle = '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="./app.js?v=retro-43"></script>';
+  const needle = '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="./app.js?v=retro-44"></script>';
   if (!original.includes(needle)) {
     throw new Error("Unable to find sync-core/app.js script boundary in index.html");
   }
   return original.replace(
     needle,
-    '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="/__sync-smoke-inject.js"></script>\n    <script src="./app.js?v=retro-43"></script>',
+    '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="/__sync-smoke-inject.js"></script>\n    <script src="./app.js?v=retro-44"></script>',
   );
 }
 
@@ -357,6 +357,17 @@ function pageExpression() {
       historicalCardCount: document.querySelectorAll("#bindingRows .binding-card:not(.compact-card)").length,
       compactCardCount: document.querySelectorAll("#bindingRows .binding-card.compact-card").length,
       directBindingControlCount: document.querySelectorAll("#bindingRows .binding-card .binding-controls").length,
+      modeBadgeCount: document.querySelectorAll("#bindingRows .operation-mode-badge").length,
+      modeBadgeInsideSlotCount: document.querySelectorAll("#bindingRows .slot-pill > .operation-mode-badge").length,
+      scenario1ModeBadge: (() => {
+        const badge = document.querySelector('[data-row-id="scenario-1"] .operation-mode-badge');
+        return badge ? {
+          text: badge.textContent || "",
+          mode: badge.dataset.mode || "",
+          title: badge.title || "",
+          ariaLabel: badge.getAttribute("aria-label") || "",
+        } : null;
+      })(),
       disclosureControlCount: document.querySelectorAll("#bindingRows .binding-controls > .inline-detail-toggle").length,
       disclosureInActionCount: document.querySelectorAll("#bindingRows .card-action .inline-detail-toggle").length,
       rightAlignedDisclosureCount: Array.from(document.querySelectorAll("#bindingRows .binding-card"))
@@ -485,6 +496,16 @@ function pageExpression() {
   if (state().directBindingControlCount !== state().historicalCardCount) {
     throw new Error("Every historical card must keep direct binding controls: " + JSON.stringify(state()));
   }
+  if (state().modeBadgeCount !== state().historicalCardCount
+    || state().modeBadgeInsideSlotCount !== state().historicalCardCount
+    || JSON.stringify(state().scenario1ModeBadge) !== JSON.stringify({
+      text: "DEF",
+      mode: "DEFAULT",
+      title: "MODE: DEFAULT",
+      ariaLabel: "触发模式 DEFAULT",
+    })) {
+    throw new Error("Every slot pill must expose its complete DEFAULT mode badge: " + JSON.stringify(state()));
+  }
   if (state().disclosureControlCount !== state().historicalCardCount
     || state().disclosureInActionCount
     || state().rightAlignedDisclosureCount !== state().historicalCardCount) {
@@ -510,6 +531,18 @@ function pageExpression() {
     || state().detailStatePersisted) {
     throw new Error("Inline detail must expose one MODE/CTX editor and a first-row boundary: " + JSON.stringify(state()));
   }
+  select(".inline-card-detail .activation-mode-select", "DOUBLE_TAP");
+  await waitFor(
+    (current) => current.scenario1ModeBadge?.text === "2T"
+      && current.scenario1ModeBadge.mode === "DOUBLE_TAP",
+    "mode badge follows inline MODE change",
+  );
+  select(".inline-card-detail .activation-mode-select", "DEFAULT");
+  await waitFor(
+    (current) => current.scenario1ModeBadge?.text === "DEF"
+      && current.scenario1ModeBadge.mode === "DEFAULT",
+    "mode badge returns to DEFAULT without changing later conflict semantics",
+  );
   click('[data-inline-detail-command="next"]');
   click('[data-inline-detail-command="next"]');
   await waitFor(
@@ -731,6 +764,29 @@ function responsiveGeometryExpression() {
         overflowRelationshipCards: relationshipCards
           .filter((element) => element.scrollWidth > element.clientWidth + 1)
           .map((element) => element.closest(".binding-card")?.dataset.rowId || "unknown"),
+        overflowModeBadges: Array.from(document.querySelectorAll(".slot-pill > .operation-mode-badge"))
+          .filter((badge) => {
+            const slot = badge.parentElement.getBoundingClientRect();
+            const value = badge.getBoundingClientRect();
+            return value.left < slot.left - 1
+              || value.right > slot.right + 1
+              || value.top < slot.top - 1
+              || value.bottom > slot.bottom + 1;
+          })
+          .map((badge) => badge.closest(".binding-card")?.dataset.rowId || "unknown"),
+        overlappingModeBadges: Array.from(document.querySelectorAll(".slot-pill > .operation-mode-badge"))
+          .filter((badge) => {
+            const value = badge.getBoundingClientRect();
+            return Array.from(badge.parentElement.querySelectorAll(".slot-pill-label, .slot-pill-code"))
+              .some((content) => {
+                const target = content.getBoundingClientRect();
+                return value.left < target.right
+                  && value.right > target.left
+                  && value.top < target.bottom
+                  && value.bottom > target.top;
+              });
+          })
+          .map((badge) => badge.closest(".binding-card")?.dataset.rowId || "unknown"),
         minTouchControlHeight: touchControls.length
           ? Math.min(...touchControls.map((element) => element.getBoundingClientRect().height))
           : 0,
@@ -788,6 +844,12 @@ function assertResponsiveGeometry(viewport, result) {
       cards: result.overflowCards,
       relationships: result.overflowRelationshipCards,
     })}`);
+  }
+  if (result.overflowModeBadges.length) {
+    throw new Error(`${viewport.name} MODE badges escape slot pills: ${JSON.stringify(result.overflowModeBadges)}`);
+  }
+  if (result.overlappingModeBadges.length) {
+    throw new Error(`${viewport.name} MODE badges overlap labels or codes: ${JSON.stringify(result.overlappingModeBadges)}`);
   }
   if (result.listControls.left < result.list.left - tolerance || result.listControls.right > result.list.right + tolerance) {
     throw new Error(`${viewport.name} list controls escape list zone: ${JSON.stringify({

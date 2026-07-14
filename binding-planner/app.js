@@ -9,6 +9,21 @@
     workspaceCore.DEFAULT_ACTIVATION_MODE,
     ...new Set([...seed.gameRows, ...seed.scenarioRows].map((row) => row.activationMode)),
   ].filter((mode, index, values) => mode && values.indexOf(mode) === index);
+  const activationModeBadgeLabels = Object.freeze({
+    DEFAULT: "DEF",
+    TAP: "TAP",
+    PRESS: "PRS",
+    HOLD: "HLD",
+    DOUBLE_TAP: "2T",
+    ALL: "ALL",
+    SMART_TOGGLE: "STG",
+    HOLD_TOGGLE: "HTG",
+    HOLD_NO_RETRIGGER: "HNR",
+    DELAYED_PRESS: "D-P",
+    DELAYED_PRESS_MEDIUM: "DPM",
+    DELAYED_HOLD: "D-H",
+    DELAYED_HOLD_NO_RETRIGGER: "DHN",
+  });
   const layers = ["base", "shift1", "shift2"];
   const layerLabels = { base: "Base", shift1: "S1", shift2: "S2" };
   const handLabels = { left: "左杆", right: "右杆" };
@@ -1018,6 +1033,13 @@
     return workspaceCore.normalizeActivationMode(
       bindingForRow(row)?.activationMode || profile.actionModes[row.actionKey],
     );
+  }
+
+  function modeBadgeLabel(mode) {
+    const normalized = workspaceCore.normalizeActivationMode(mode);
+    return activationModeBadgeLabels[normalized]
+      || normalized.replace(/[^A-Z0-9]/g, "").slice(0, 4)
+      || "DEF";
   }
 
   function contextIdsForRow(row) {
@@ -2110,6 +2132,11 @@
     const pendingLayer = getPendingLayer();
     const isSelected = row.id === selectedRowId;
     const label = makeEl("span", "slot-pill-label", binding?.slot ? slotLabel(binding.slot) : isSelected ? "待点选" : "未分配");
+    const mode = activationModeForRow(row);
+    const modeBadge = makeEl("span", "operation-mode-badge", modeBadgeLabel(mode));
+    modeBadge.dataset.mode = mode;
+    modeBadge.title = `MODE: ${mode}`;
+    modeBadge.setAttribute("aria-label", `触发模式 ${mode}`);
     let slotMeta = "";
     if (row.id === selectedRowId) {
       if (targetHand) {
@@ -2121,7 +2148,7 @@
     if (binding?.slot && state.uiSettings.showCodes) {
       slotMeta = compactCodeForSlot(binding.slot);
     }
-    button.append(light, label);
+    button.append(light, label, modeBadge);
     if (slotMeta) button.append(makeEl("span", "slot-pill-code", slotMeta));
     return button;
   }

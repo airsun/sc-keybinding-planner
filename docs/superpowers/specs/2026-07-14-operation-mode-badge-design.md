@@ -42,7 +42,7 @@ No workspace field is added. Export, import, online sync, conflict occupancy, an
 
 - Use a thin amber border and compact monospace text consistent with existing micro-labels.
 - Reserve a small amount of right padding inside `.slot-pill` so the badge cannot cover the key label.
-- Keep the badge non-interactive and pointer-transparent.
+- Do not add a badge command; allow hover so its full MODE tooltip remains available, while clicks continue to bubble to the existing slot-pill action.
 - Preserve the key label and `#code` as the primary content.
 - Verify collapsed and expanded cards at phone, iPad portrait, iPad landscape, 2K, and 4K sizes.
 
