@@ -64,8 +64,18 @@ function smokeInjectSource() {
     workspace.activeProfileId = profileId;
     workspace.uiSettings = {
       ...(workspace.uiSettings || {}),
-      selectedRowId: "scenario:flight-ready",
+      activeList: "scenario",
+      statusFilter: "all",
+      selectedRowId: "scenario-3",
     };
+    const profile = workspace.profiles?.[profileId];
+    const flightReady = profile?.bindings?.v_flightready;
+    if (flightReady && profileId === "ground") {
+      flightReady.slot = { slotType: "button", hand: "right", control: "C1_press", layer: "shift1" };
+    }
+    if (flightReady && profileId === "combat") {
+      flightReady.slot = { slotType: "button", hand: "left", control: "C1_press", layer: "shift2" };
+    }
     workspace.updatedAt = new Date().toISOString();
     return workspace;
   }
@@ -169,13 +179,13 @@ function smokeInjectSource() {
 
 async function serveSmokeHtml() {
   const original = await readFile(path.join(appRoot, "index.html"), "utf8");
-  const needle = '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="./app.js?v=retro-44"></script>';
+  const needle = '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="./app.js?v=retro-45"></script>';
   if (!original.includes(needle)) {
     throw new Error("Unable to find sync-core/app.js script boundary in index.html");
   }
   return original.replace(
     needle,
-    '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="/__sync-smoke-inject.js"></script>\n    <script src="./app.js?v=retro-44"></script>',
+    '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="/__sync-smoke-inject.js"></script>\n    <script src="./app.js?v=retro-45"></script>',
   );
 }
 
@@ -394,8 +404,26 @@ function pageExpression() {
       previousDisabled: Boolean(document.querySelector('[data-inline-detail-command="previous"]')?.disabled),
       nextDisabled: Boolean(document.querySelector('[data-inline-detail-command="next"]')?.disabled),
       detailStatePersisted: Object.keys(workspace.uiSettings || {}).some((key) => /detail|expanded|transition/i.test(key)),
+      highlightStatePersisted: Object.keys(workspace.uiSettings || {}).some((key) => /pulse|current|arrival|highlight|selectionCause|revision/i.test(key)),
       selectedCardRowId: document.querySelector("#bindingRows .binding-card.selected")?.dataset.rowId || "",
       currentStickSlotCount: document.querySelectorAll(".stick-panel .slot.current").length,
+      currentStickSlots: Array.from(document.querySelectorAll(".stick-panel .slot.current")).map((slot) => ({
+        hand: slot.dataset.hand || "",
+        control: slot.dataset.control || "",
+      })),
+      selectionArrivalCount: document.querySelectorAll(".stick-panel .slot.selection-arrived").length,
+      currentSlotAnimations: Array.from(document.querySelectorAll(".stick-panel .slot.current"))
+        .map((slot) => getComputedStyle(slot).animationName),
+      activeStickLayers: {
+        left: document.querySelector("#leftPanel .layer-switch button.active")?.textContent || "",
+        right: document.querySelector("#rightPanel .layer-switch button.active")?.textContent || "",
+      },
+      bindingLayerIndicators: Array.from(document.querySelectorAll(".stick-panel .layer-switch button.binding-layer"))
+        .map((button) => ({
+          hand: button.closest("#leftPanel") ? "left" : "right",
+          label: button.textContent || "",
+          active: button.classList.contains("active"),
+        })),
       cardWrapScrollTop: $("#cardWrap").scrollTop,
       selectedRowCentered: (() => {
         const wrap = $("#cardWrap").getBoundingClientRect();
@@ -524,6 +552,116 @@ function pageExpression() {
     throw new Error("Expected shared action relationship for scenario-8: " + JSON.stringify(state().rowRelationships));
   }
 
+  const currentSlotIs = (current, hand, control) => current.currentStickSlotCount === 1
+    && current.currentStickSlots[0]?.hand === hand
+    && current.currentStickSlots[0]?.control === control;
+
+  if (state().selectedCardRowId !== "scenario-1" || !currentSlotIs(state(), "left", "A3_press")) {
+    throw new Error("Initial visible card must own the exact current stick slot: " + JSON.stringify(state()));
+  }
+  click('[data-row-id="scenario-3"] .card-action');
+  await waitFor(
+    (current) => current.selectedCardRowId === "scenario-3"
+      && current.activeStickLayers.left === "S2"
+      && current.selectionArrivalCount === 1
+      && currentSlotIs(current, "left", "C1_press"),
+    "direct selection reveals exact hand layer and slot",
+  );
+  await sleep(850);
+  await waitFor(
+    (current) => current.selectionArrivalCount === 0
+      && current.currentSlotAnimations.every((name) => name === "none"),
+    "selected slot settles without perpetual animation",
+  );
+  click("#toggleCodesBtn");
+  if (state().selectionArrivalCount || !currentSlotIs(state(), "left", "C1_press")) {
+    throw new Error("Unrelated render must not replay slot arrival: " + JSON.stringify(state()));
+  }
+
+  Array.from(document.querySelectorAll("#leftPanel .layer-switch button"))
+    .find((button) => button.textContent === "Base")?.click();
+  await waitFor(
+    (current) => current.activeStickLayers.left === "Base"
+      && current.currentStickSlotCount === 0
+      && current.bindingLayerIndicators.some((item) => item.hand === "left" && item.label === "S2" && !item.active),
+    "manual layer browsing hides exact slot and marks return layer",
+  );
+  document.querySelector("#leftPanel .layer-switch button.binding-layer")?.click();
+  await waitFor(
+    (current) => current.activeStickLayers.left === "S2" && currentSlotIs(current, "left", "C1_press"),
+    "binding layer restores exact current slot",
+  );
+
+  click('[data-row-id="scenario-108"] .card-action');
+  await waitFor(
+    (current) => current.selectedCardRowId === "scenario-108" && currentSlotIs(current, "left", "A3_up"),
+    "repeated action row keeps its own selected card and shared exact slot",
+  );
+  click('[data-row-id="scenario-3"] .card-action');
+
+  click("#gameTab");
+  await waitFor(
+    (current) => current.selectedCardRowId === "game-38" && currentSlotIs(current, "left", "C1_press"),
+    "list mode maps exact action key",
+  );
+  click("#scenarioTab");
+  await waitFor((current) => current.selectedCardRowId === "scenario-3", "scenario list restores exact action key row");
+
+  click('[data-row-id="scenario-28"] .card-action');
+  await waitFor((current) => currentSlotIs(current, "right", "main_y"), "axis selection becomes current");
+  Array.from(document.querySelectorAll("#rightPanel .layer-switch button"))
+    .find((button) => button.textContent === "S1")?.click();
+  if (!currentSlotIs(state(), "right", "main_y")) {
+    throw new Error("Axis selection must remain current while button layers change: " + JSON.stringify(state()));
+  }
+
+  click('[data-row-id="scenario-3"] .card-action');
+  Array.from(document.querySelectorAll("#leftPanel .layer-switch button"))
+    .find((button) => button.textContent === "Base")?.click();
+  click('#leftPanel .slot[data-control="A3_press"]');
+  await waitFor(
+    (current) => currentSlotIs(current, "left", "A3_press")
+      && current.toasts.some((text) => text.includes("CONFLICT")),
+    "conflicting reassignment exposes undo",
+  );
+  primaryToast();
+  await waitFor(
+    (current) => current.selectedCardRowId === "scenario-3"
+      && current.activeStickLayers.left === "S2"
+      && currentSlotIs(current, "left", "C1_press"),
+    "undo restores and reveals exact binding",
+  );
+
+  click('[data-row-id="scenario-112"] .card-action');
+  await waitFor(
+    (current) => current.selectedCardRowId === "scenario-112" && current.currentStickSlotCount === 0,
+    "unbound selection has no current stick slot",
+  );
+  fill("#searchInput", "__no_visible_selection__");
+  await waitFor(
+    (current) => !current.selectedCardRowId && !current.selectedRowId && current.currentStickSlotCount === 0,
+    "search clears hidden selection",
+  );
+  const bindingCountBeforeHiddenClick = Object.keys(JSON.parse(localStorage.getItem(workspaceKey)).profiles.default.bindings).length;
+  click('#leftPanel .slot[data-control="trigger_s1"]');
+  const bindingCountAfterHiddenClick = Object.keys(JSON.parse(localStorage.getItem(workspaceKey)).profiles.default.bindings).length;
+  if (bindingCountAfterHiddenClick !== bindingCountBeforeHiddenClick
+    || !state().toasts.some((text) => text.includes("先选择一行动作"))) {
+    throw new Error("Hardware click must not mutate a hidden operation: " + JSON.stringify(state()));
+  }
+  fill("#searchInput", "");
+  click('[data-row-id="scenario-1"] .card-action');
+  click('[data-filter="unbound"]');
+  await waitFor(
+    (current) => !current.selectedCardRowId && !current.selectedRowId && current.currentStickSlotCount === 0,
+    "status filter clears hidden selection",
+  );
+  click('[data-filter="all"]');
+  if (state().highlightStatePersisted) {
+    throw new Error("Highlight presentation state must not persist: " + JSON.stringify(state()));
+  }
+  record("selected card and stick highlight contract");
+
   await openDetail("scenario-1");
   if (state().inlineModeControlCount !== 1
     || state().inlineContextControlCount !== 1
@@ -643,7 +781,14 @@ function pageExpression() {
   await waitFor((current) => current.toasts.some((text) => text.includes("Pull 会覆盖")), "pull overwrite confirmation");
   record("pull overwrite confirmation shown");
   primaryToast();
-  await waitFor((current) => current.activeProfileId === "ground" && current.syncConfig.lastRemoteSha === remoteShaForPull, "pull overwrite applied");
+  await waitFor(
+    (current) => current.activeProfileId === "ground"
+      && current.syncConfig.lastRemoteSha === remoteShaForPull
+      && current.selectedCardRowId === "scenario-3"
+      && current.activeStickLayers.right === "S1"
+      && currentSlotIs(current, "right", "C1_press"),
+    "pull overwrite applies selected binding context",
+  );
   record("pull overwrite applied");
 
   select("#profileSelect", "mining");
@@ -658,7 +803,13 @@ function pageExpression() {
   await waitFor((current) => current.toasts.some((text) => text.includes("导入会覆盖")), "import overwrite confirmation");
   record("import overwrite confirmation shown");
   primaryToast();
-  await waitFor((current) => current.activeProfileId === "combat", "import applied");
+  await waitFor(
+    (current) => current.activeProfileId === "combat"
+      && current.selectedCardRowId === "scenario-3"
+      && current.activeStickLayers.left === "S2"
+      && currentSlotIs(current, "left", "C1_press"),
+    "import applies selected binding context",
+  );
   record("import still works");
 
   await sleep(400);
@@ -680,7 +831,10 @@ function pageExpression() {
     (current) => current.repairCount === 0
       && !current.repairButtonVisible
       && current.repairTargetBinding?.activationMode === "DOUBLE_TAP"
-      && current.repairTargetBinding?.slot?.control === "A3_left",
+      && current.repairTargetBinding?.slot?.control === "A3_left"
+      && !current.selectedCardRowId
+      && !current.selectedRowId
+      && current.currentStickSlotCount === 0,
     "repair resolution",
   );
   record("quarantined binding explicitly resolved");
@@ -957,6 +1111,41 @@ async function verifyResponsiveMatrix(cdp, url) {
   return results;
 }
 
+async function verifyReducedMotion(cdp, url) {
+  await cdp.call("Emulation.setDeviceMetricsOverride", {
+    width: 1366,
+    height: 1024,
+    screenWidth: 1366,
+    screenHeight: 1024,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  await cdp.call("Emulation.setTouchEmulationEnabled", { enabled: false, maxTouchPoints: 1 });
+  await cdp.call("Emulation.setEmulatedMedia", {
+    media: "screen",
+    features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+  });
+  await cdp.call("Page.navigate", { url });
+  await evaluate(cdp, appReadyExpression());
+  const result = await evaluate(cdp, `
+    (() => {
+      document.querySelector('[data-row-id="scenario-3"] .card-action').click();
+      const slot = document.querySelector('#leftPanel .slot.current[data-control="C1_press"]');
+      if (!slot) throw new Error("Reduced-motion selection did not reveal the exact slot");
+      return {
+        current: true,
+        arrivalClass: slot.classList.contains("selection-arrived"),
+        elementAnimation: getComputedStyle(slot).animationName,
+        frameAnimation: getComputedStyle(slot, "::before").animationName,
+      };
+    })()
+  `);
+  if (result.elementAnimation !== "none" || result.frameAnimation !== "none") {
+    throw new Error(`Reduced motion must keep the selected frame without animation: ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
 async function main() {
   let server;
   let chrome;
@@ -984,7 +1173,8 @@ async function main() {
     await evaluate(cdp, appReadyExpression());
     const steps = await evaluate(cdp, pageExpression());
     const responsive = await verifyResponsiveMatrix(cdp, served.url);
-    console.log(JSON.stringify({ ok: true, steps, responsive }, null, 2));
+    const reducedMotion = await verifyReducedMotion(cdp, served.url);
+    console.log(JSON.stringify({ ok: true, steps, responsive, reducedMotion }, null, 2));
   } finally {
     if (cdp) cdp.close();
     if (chrome) {

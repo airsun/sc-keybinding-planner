@@ -6584,11 +6584,103 @@ body.help-open {
   }
 }
 
+/* Selected operation binding: stable exact-slot frame and explicit layer return target. */
+.stick-panel .layer-switch button.binding-layer:not(.active) {
+  position: relative;
+  border-color: rgba(95, 214, 178, 0.76);
+  color: #9fffd7;
+  background:
+    linear-gradient(180deg, rgba(24, 85, 67, 0.2), rgba(2, 13, 8, 0.94)),
+    #020905;
+  box-shadow: inset 0 -2px 0 rgba(95, 214, 178, 0.68);
+}
+
+.stick-panel .layer-switch button.binding-layer:not(.active)::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #9fffd7;
+  box-shadow: 0 0 5px rgba(95, 214, 178, 0.72);
+}
+
+.stick-panel .slot.current,
+.stick-panel .slot.current.locked {
+  border-color: #5fd6b2;
+  color: #9fffd7;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(95, 214, 178, 0.13), transparent 45%),
+    linear-gradient(180deg, rgba(14, 55, 44, 0.34), rgba(2, 13, 8, 0.92)),
+    #020905;
+  box-shadow:
+    inset 0 0 0 1px rgba(95, 214, 178, 0.38),
+    inset 0 0 14px rgba(19, 96, 73, 0.2),
+    0 0 10px rgba(95, 214, 178, 0.14);
+  filter: none;
+  animation: none;
+}
+
+.stick-panel .slot.current::before {
+  border-color: #5fd6b2;
+  opacity: 0.82;
+  box-shadow:
+    0 0 0 1px rgba(95, 214, 178, 0.2),
+    0 0 12px rgba(95, 214, 178, 0.16);
+  animation: none;
+}
+
+.stick-panel .slot.current.locked:not(.conflict) {
+  box-shadow:
+    inset 0 0 0 1px rgba(240, 185, 87, 0.64),
+    inset 0 0 14px rgba(19, 96, 73, 0.2),
+    0 0 10px rgba(95, 214, 178, 0.14);
+}
+
+.stick-panel .slot.current.conflict {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 93, 77, 0.78),
+    inset 0 0 14px rgba(110, 25, 19, 0.24),
+    0 0 10px rgba(95, 214, 178, 0.14);
+}
+
+.stick-panel .slot.current.uncalibrated {
+  border-style: dashed;
+}
+
+.stick-panel .slot.current.selection-arrived::before {
+  animation: selectedSlotArrivalFrame 640ms ease-out 1;
+}
+
+@keyframes selectedSlotArrivalFrame {
+  0% {
+    opacity: 0.34;
+    box-shadow:
+      0 0 0 1px rgba(95, 214, 178, 0.16),
+      0 0 4px rgba(95, 214, 178, 0.08);
+  }
+  38% {
+    opacity: 1;
+    box-shadow:
+      0 0 0 2px rgba(159, 255, 215, 0.62),
+      0 0 22px rgba(95, 214, 178, 0.38);
+  }
+  100% {
+    opacity: 0.82;
+    box-shadow:
+      0 0 0 1px rgba(95, 214, 178, 0.2),
+      0 0 12px rgba(95, 214, 178, 0.16);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .binding-card.detail-expanded::before,
   .inline-card-detail,
   .detail-enter-next .inline-card-detail,
-  .detail-enter-previous .inline-card-detail {
+  .detail-enter-previous .inline-card-detail,
+  .stick-panel .slot.current.selection-arrived::before {
     animation: none;
   }
 }

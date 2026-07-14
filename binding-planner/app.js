@@ -155,6 +155,8 @@
 
   let state = loadState();
   let selectedRowId = state.uiSettings.selectedRowId || null;
+  let lastSelectedBindingSlotKey = "";
+  let selectionArrivalSlotKey = "";
   let expandedRowId = null;
   let expandedProfileId = null;
   let expandedStateRef = null;
@@ -418,14 +420,14 @@
 
   function applyPulledWorkspace(nextState, remoteSha) {
     state = nextState;
-    selectedRowId = findRow(state.uiSettings.selectedRowId)?.id || seed.scenarioRows[0]?.id || seed.gameRows[0]?.id || null;
+    selectedRowId = findRow(state.uiSettings.selectedRowId)?.id || null;
     saveState();
     saveSyncConfig({
       ...syncConfig,
       lastRemoteSha: remoteSha,
       lastSyncAt: new Date().toISOString(),
     });
-    render();
+    render({ revealSelection: true, pulseSelection: true });
     notifyPendingRepairs("Workspace 已从远端迁移到 v4");
   }
 
@@ -557,9 +559,9 @@
 
     state.activeProfileId = repairSelection.profileId;
     const targetRow = allRows().find((row) => row.actionKey === actionKey);
-    if (targetRow) selectedRowId = targetRow.id;
+    if (targetRow) applySelectedRow(targetRow);
     saveState();
-    render();
+    render({ mapActionKey: actionKey, revealSelection: true, pulseSelection: true });
     if (pendingRepairItems().length) {
       repairSelection = null;
       renderRepairDialog();
@@ -793,7 +795,7 @@
     if (!state.profiles?.[profileId] || profileId === state.activeProfileId) return;
     state.activeProfileId = profileId;
     saveState();
-    render();
+    render({ revealSelection: true, pulseSelection: true });
   }
 
   function openProfileDialog() {
@@ -837,7 +839,7 @@
     state.activeProfileId = id;
     dom.profileDialog.close();
     saveState();
-    render();
+    render({ revealSelection: true, pulseSelection: true });
     showToast(`已创建 Profile：${name}`, { tone: "info" });
   }
 
@@ -881,7 +883,7 @@
     delete state.profiles[profileId];
     state.activeProfileId = fallbackId;
     saveState();
-    render();
+    render({ revealSelection: true, pulseSelection: true });
     showToast(`已删除 Profile：${profileName}`, { tone: "info" });
   }
 
@@ -977,6 +979,11 @@
     return slotKey(a) === slotKey(b);
   }
 
+  function selectedBindingSlot() {
+    const row = selectedRowId ? findRow(selectedRowId) : null;
+    return row ? bindingForRow(row)?.slot || null : null;
+  }
+
   function codeForSlot(slot) {
     if (!slot) return "";
     const control = getControl(slot.hand, slot.control);
@@ -1065,9 +1072,9 @@
       profile.actionContexts[row.actionKey] = clone(normalized);
     }
     if (binding) binding.contextIds = clone(normalized);
-    selectedRowId = row.id;
+    applySelectedRow(row, { revealBinding: true });
     saveState();
-    render();
+    render({ pulseSelection: true });
     return true;
   }
 
@@ -1087,9 +1094,9 @@
       profile.actionModes[row.actionKey] = mode;
     }
     if (binding) binding.activationMode = mode;
-    selectedRowId = row.id;
+    applySelectedRow(row, { revealBinding: true });
     saveState();
-    render();
+    render({ pulseSelection: true });
   }
 
   function occupancy() {
@@ -1158,7 +1165,7 @@
       locked: occupants.some((item) => item.locked),
       conflict: bindingsHaveTrueConflict(occupants),
       uncalibrated: code === "--",
-      current: selectedRowId ? occupants.some((item) => item.actionKey === findRow(selectedRowId)?.actionKey) : false,
+      current: sameSlot(selectedBindingSlot(), slot),
       disabled: !control || control.bindable === false,
     };
   }
@@ -1375,6 +1382,15 @@
     const panel = hand === "left" ? dom.leftPanel : dom.rightPanel;
     const title = hand === "left" ? "L 左杆" : "R 右杆";
     const layer = getLayerForHand(hand);
+    const currentBinding = selectedBindingSlot();
+    const currentBindingControl = currentBinding?.hand && currentBinding?.control
+      ? getControl(currentBinding.hand, currentBinding.control)
+      : null;
+    const bindingLayer = currentBinding?.slotType === "button"
+      && currentBinding.hand === hand
+      && currentBindingControl?.shiftCapable
+      ? currentBinding.layer || "base"
+      : null;
     const controls = state.deviceConfig.hands[hand].controls;
     const occ = occupancy();
 
@@ -1389,7 +1405,17 @@
     for (const item of layers) {
       const button = makeEl("button", item === layer ? "active" : "", layerLabels[item]);
       button.type = "button";
-      setTooltip(button, `${handLabels[hand]} · 切换到 ${layerLabels[item]} 层`);
+      if (item === bindingLayer) {
+        button.classList.add("binding-layer");
+        button.dataset.bindingLayer = "true";
+        button.setAttribute("aria-label", `${handLabels[hand]} · ${layerLabels[item]} · 当前选中绑定所在层`);
+      }
+      setTooltip(
+        button,
+        item === bindingLayer
+          ? `${handLabels[hand]} · ${layerLabels[item]} · 当前选中绑定所在层`
+          : `${handLabels[hand]} · 切换到 ${layerLabels[item]} 层`,
+      );
       button.addEventListener("click", () => setLayerForHand(hand, item));
       layerSwitch.append(button);
     }
@@ -1542,6 +1568,14 @@
     for (const className of ["occupied", "locked", "conflict", "uncalibrated", "current"]) {
       if (status[className]) button.classList.add(className);
     }
+    if (status.current && slotKey(slot) === selectionArrivalSlotKey) {
+      button.classList.add("selection-arrived");
+      button.addEventListener("animationend", (event) => {
+        if (event.animationName === "selectedSlotArrivalFrame") {
+          button.classList.remove("selection-arrived");
+        }
+      });
+    }
     button.title = `${handLabels[hand]} · ${control.label}`;
     setTooltip(button, `${handLabels[hand]} · ${control.label} · 点击绑定当前动作`);
 
@@ -1605,8 +1639,47 @@
     return result;
   }
 
-  function renderRows() {
-    const entries = visibleRows();
+  function selectedEntry(entries) {
+    return selectedRowId ? entries.find(({ row }) => row.id === selectedRowId) || null : null;
+  }
+
+  function applySelectedRow(row, options = {}) {
+    selectedRowId = row?.id || null;
+    if (!row) {
+      clearPendingTarget();
+      return;
+    }
+    if (!options.revealBinding) return;
+    const binding = bindingForRow(row);
+    if (binding?.slot) {
+      syncSlotLayerContext(binding.slot);
+    } else {
+      clearPendingTarget();
+    }
+  }
+
+  function reconcileVisibleSelection(entries, options = {}) {
+    let entry = selectedEntry(entries);
+    if (!entry && options.mapActionKey) {
+      entry = entries.find(({ row }) => row.actionKey === options.mapActionKey) || null;
+    }
+    if (!entry) {
+      applySelectedRow(null);
+    } else {
+      applySelectedRow(entry.row, { revealBinding: Boolean(options.revealSelection) });
+    }
+
+    const nextSlotKey = entry ? slotKey(bindingForRow(entry.row)?.slot) : "";
+    selectionArrivalSlotKey = options.pulseSelection
+      && nextSlotKey
+      && nextSlotKey !== lastSelectedBindingSlotKey
+      ? nextSlotKey
+      : "";
+    lastSelectedBindingSlotKey = nextSlotKey;
+    return entry;
+  }
+
+  function renderRows(entries = visibleRows()) {
     reconcileExpandedDetail(entries);
     dom.rows.replaceChildren();
 
@@ -2058,9 +2131,9 @@
       delete bindings[item.actionKey];
     }
     const row = allRows().find((item) => item.actionKey === binding.actionKey);
-    if (row) selectedRowId = row.id;
+    if (row) applySelectedRow(row);
     saveState();
-    render();
+    render({ mapActionKey: binding.actionKey, revealSelection: true, pulseSelection: true });
     if (locked.length) showToast("已解绑未锁定冲突；仍有锁定冲突需要手动解除。", { tone: "warn" });
   }
 
@@ -2243,25 +2316,20 @@
   }
 
   function selectRow(rowId) {
-    selectedRowId = rowId;
+    const row = findRow(rowId);
+    applySelectedRow(row, { revealBinding: true });
     saveState();
-    render();
+    render({ pulseSelection: true });
   }
 
   function focusBinding(row) {
-    selectedRowId = row.id;
-    const binding = bindingForRow(row);
-    if (binding?.slot) {
-      syncSlotLayerContext(binding.slot);
-    } else {
-      clearPendingTarget();
-    }
+    applySelectedRow(row, { revealBinding: true });
     saveState();
-    render();
+    render({ pulseSelection: true });
   }
 
   function setBindingHand(row, hand) {
-    selectedRowId = row.id;
+    applySelectedRow(row);
     const binding = bindingForRow(row);
     if (!binding?.slot) {
       state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
@@ -2291,7 +2359,7 @@
   }
 
   function setBindingLayer(row, layer) {
-    selectedRowId = row.id;
+    applySelectedRow(row);
     const binding = bindingForRow(row);
     if (!binding?.slot) {
       const targetHand = getTargetHand();
@@ -2396,10 +2464,10 @@
       locked: existing?.locked || false,
       note: existing?.note || "",
     };
-    selectedRowId = row.id;
+    applySelectedRow(row);
     syncSlotLayerContext(slot);
     saveState();
-    render();
+    render({ pulseSelection: true });
     if (occupants.length && options.allowConflict) {
       showConflictToast(row, slot, undoSnapshot);
     }
@@ -2444,16 +2512,17 @@
     }
     state.activeProfileId = snapshot.profileId;
     state.uiSettings.layers = clone(snapshot.previousLayers);
-    selectedRowId = snapshot.rowId;
+    applySelectedRow(findRow(snapshot.rowId));
     saveState();
-    render();
+    render({ revealSelection: true, pulseSelection: true });
     showToast("已撤销刚才设定。", { tone: "info" });
   }
 
   function revealBinding(rowId) {
-    selectedRowId = rowId;
+    const row = findRow(rowId);
+    applySelectedRow(row);
     saveState();
-    render();
+    render({ mapActionKey: row?.actionKey, revealSelection: true, pulseSelection: true });
     window.setTimeout(() => {
       const card = dom.rows.querySelector(`[data-row-id="${rowId}"]`);
       card?.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -2516,11 +2585,11 @@
   }
 
   function toggleRowLock(row) {
-    selectedRowId = row.id;
+    applySelectedRow(row, { revealBinding: true });
     const binding = activeBindings()[row.actionKey];
     if (!binding) {
       saveState();
-      render();
+      render({ pulseSelection: true });
       return;
     }
     binding.locked = !binding.locked;
@@ -2534,17 +2603,17 @@
   }
 
   function clearRowBinding(row) {
-    selectedRowId = row.id;
+    applySelectedRow(row, { revealBinding: true });
     const bindings = activeBindings();
     const binding = bindings[row.actionKey];
     if (!binding) {
       saveState();
-      render();
+      render({ pulseSelection: true });
       return false;
     }
     if (binding.locked) {
       saveState();
-      render();
+      render({ pulseSelection: true });
       showToast("这个绑定已锁定，先解除锁定再解绑。", { tone: "warn" });
       return false;
     }
@@ -2707,9 +2776,9 @@
           duration: 8200,
           onAction: () => {
             state = nextState;
-            selectedRowId = findRow(state.uiSettings.selectedRowId)?.id || seed.scenarioRows[0]?.id || seed.gameRows[0]?.id || null;
+            selectedRowId = findRow(state.uiSettings.selectedRowId)?.id || null;
             saveState();
-            render();
+            render({ revealSelection: true, pulseSelection: true });
             if (pendingRepairItems().length) {
               notifyPendingRepairs("Workspace 已导入并迁移到 v4");
             } else {
@@ -2741,9 +2810,10 @@
   }
 
   function setActiveList(listType) {
+    const previousActionKey = findRow(selectedRowId)?.actionKey || null;
     state.uiSettings.activeList = listType;
     saveState();
-    render();
+    render({ mapActionKey: previousActionKey, revealSelection: true, pulseSelection: true });
   }
 
   function setStatusFilter(filter) {
@@ -2765,15 +2835,33 @@
     setTooltip(dom.toggleCodesBtn, state.uiSettings.showCodes ? "隐藏左右摇杆按钮编号" : "显示左右摇杆按钮编号");
   }
 
-  function render() {
+  function selectionContextSnapshot() {
+    return JSON.stringify({
+      selectedRowId,
+      persistedSelectedRowId: state.uiSettings.selectedRowId || null,
+      layers: state.uiSettings.layers || null,
+      targetHand: getTargetHand(),
+      pendingLayer: getPendingLayer(),
+    });
+  }
+
+  function render(options = {}) {
+    const selectionBefore = selectionContextSnapshot();
+    const entries = visibleRows();
+    reconcileVisibleSelection(entries, options);
+    if (selectionBefore !== selectionContextSnapshot()
+      || (state.uiSettings.selectedRowId || null) !== selectedRowId) {
+      saveState();
+    }
     renderProfileControls();
     renderRepairControl();
     renderSyncControl();
     renderTabsAndFilters();
     renderStickPanel("left");
     renderStickPanel("right");
-    renderRows();
+    renderRows(entries);
     renderSelectionBar();
+    selectionArrivalSlotKey = "";
   }
 
   dom.search.addEventListener("input", (event) => {
@@ -2861,8 +2949,6 @@
     selectedRowId = seed.scenarioRows[0].id;
   }
   state.uiSettings.layers = state.uiSettings.layers || { left: "base", right: "base" };
-  const initialRow = selectedRowId ? findRow(selectedRowId) : null;
-  if (initialRow && !bindingForRow(initialRow)) clearPendingTarget();
-  render();
+  render({ revealSelection: true, pulseSelection: true });
   notifyPendingRepairs("本地 Workspace 已迁移到 v4");
 })();
