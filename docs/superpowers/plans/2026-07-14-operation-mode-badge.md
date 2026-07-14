@@ -247,14 +247,14 @@ git diff --check
 
 Expected: all commands exit `0`; v4 remains schema `4`, four Profiles, 372 active bindings, one repair item, and zero true conflicts.
 
-- [ ] **Step 3: Mark this plan complete and commit scoped files**
+- [x] **Step 3: Mark this plan complete and commit scoped files**
 
 ```bash
 git add binding-planner/app.js binding-planner/index.html binding-planner/styles.css scripts/verify-sync-browser-smoke.mjs docs/superpowers/plans/2026-07-14-operation-mode-badge.md
 git commit -m "feat: show operation mode badges"
 ```
 
-- [ ] **Step 4: Push and verify GitHub Pages**
+- [x] **Step 4: Push and verify GitHub Pages**
 
 Run: `git push origin main`
 
