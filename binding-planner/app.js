@@ -5,6 +5,7 @@
   const syncCore = window.VKB_SYNC_CORE;
   const storageKey = "sc-dual-vkb-binding-planner:v1";
   const workspaceSchemaVersion = workspaceCore.WORKSPACE_SCHEMA_VERSION;
+  const workspaceSemanticRevision = workspaceCore.WORKSPACE_SEMANTIC_REVISION;
   const activationModes = [
     workspaceCore.DEFAULT_ACTIVATION_MODE,
     ...new Set([...seed.gameRows, ...seed.scenarioRows].map((row) => row.activationMode)),
@@ -237,6 +238,7 @@
     const profiles = defaultProfiles();
     return normalizeWorkspace({
       schemaVersion: workspaceSchemaVersion,
+      semanticRevision: workspaceSemanticRevision,
       activeProfileId: "default",
       deviceConfig: clone(seed.deviceConfig),
       contextCatalog: clone(workspaceCore.DEFAULT_CONTEXT_CATALOG),
@@ -252,6 +254,7 @@
     profiles[id] = makeProfile(id, name, data.bindings || seedBindings());
     return normalizeWorkspace({
       schemaVersion: workspaceSchemaVersion,
+      semanticRevision: workspaceSemanticRevision,
       activeProfileId: id,
       deviceConfig: data.deviceConfig || clone(seed.deviceConfig),
       profiles,
@@ -288,6 +291,7 @@
     const activeProfileId = profiles[data?.activeProfileId] ? data.activeProfileId : Object.keys(profiles)[0];
     return {
       schemaVersion: workspaceSchemaVersion,
+      semanticRevision: workspaceSemanticRevision,
       activeProfileId,
       deviceConfig: data?.deviceConfig || clone(seed.deviceConfig),
       contextCatalog: clone(data?.contextCatalog || workspaceCore.DEFAULT_CONTEXT_CATALOG),
@@ -1184,7 +1188,7 @@
         relationship,
       };
     }
-    if (codeForSlot(binding.slot) === "--") return { key: "issue", reason: "uncalibrated", label: "未校准", tone: "red" };
+    if (codeForSlot(binding.slot) === "--") return { key: "issue", reason: "uncalibrated", label: "未校准", tone: "amber" };
     if (relationship?.type === "context-reuse") {
       return {
         key: binding.locked ? "locked" : "bound",

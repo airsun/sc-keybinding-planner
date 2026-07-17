@@ -266,6 +266,58 @@ function testContextRelationships() {
   }, catalog), "different-slot");
 }
 
+function testLegacyDefaultControlLocksAreReleasedOnce() {
+  const slot = { slotType: "axis", hand: "right", control: "main_y" };
+  const workspace = {
+    schemaVersion: 4,
+    activeProfileId: "default",
+    profiles: {
+      default: {
+        id: "default",
+        name: "Default",
+        bindings: {
+          v_pitch: {
+            actionKey: "v_pitch",
+            slot,
+            enabled: true,
+            locked: true,
+            note: "默认 6DOF 轴，保持不变",
+          },
+          v_toggle_landing_system: {
+            actionKey: "v_toggle_landing_system",
+            slot: { slotType: "button", hand: "left", control: "base_f1", layer: "base" },
+            enabled: true,
+            locked: true,
+            note: "",
+          },
+          custom_pitch: {
+            actionKey: "custom_pitch",
+            slot,
+            enabled: true,
+            locked: true,
+            note: "用户主动锁定",
+          },
+        },
+      },
+    },
+  };
+  const migrated = core.migrateWorkspace(workspace);
+
+  assert.equal(migrated.profiles.default.bindings.v_pitch.locked, false);
+  assert.equal(migrated.profiles.default.bindings.v_pitch.note, "");
+  assert.equal(migrated.profiles.default.bindings.v_toggle_landing_system.locked, false);
+  assert.equal(migrated.profiles.default.bindings.custom_pitch.locked, true);
+  assert.equal(migrated.profiles.default.bindings.custom_pitch.note, "用户主动锁定");
+  assert.deepEqual(core.migrateWorkspace(migrated), migrated, "axis lock release must be idempotent");
+
+  const relocked = clone(migrated);
+  relocked.profiles.default.bindings.v_pitch.locked = true;
+  relocked.profiles.default.bindings.v_toggle_landing_system.locked = true;
+  const preserved = core.migrateWorkspace(relocked);
+  assert.equal(preserved.profiles.default.bindings.v_pitch.locked, true);
+  assert.equal(preserved.profiles.default.bindings.v_toggle_landing_system.locked, true);
+}
+
 function testRealSeedInvariant() {
   global.window = {};
   require("../binding-planner/data.js");
@@ -289,6 +341,7 @@ testWorkspaceMigration();
 testRepairResolution();
 testConflictIdentity();
 testContextRelationships();
+testLegacyDefaultControlLocksAreReleasedOnce();
 testRealSeedInvariant();
 
 console.log("workspace repair verification passed");

@@ -1146,6 +1146,160 @@ async function verifyReducedMotion(cdp, url) {
   return result;
 }
 
+async function verifyDefaultControlsRemainEditable(cdp, url) {
+  const actionKeys = [
+    "v_pitch",
+    "v_roll",
+    "v_yaw",
+    "v_strafe_lateral",
+    "v_strafe_longitudinal",
+    "v_strafe_vertical",
+    "v_toggle_landing_system",
+    "v_toggle_vtol",
+    "v_transform_cycle",
+  ];
+  await evaluate(cdp, `localStorage.removeItem(${JSON.stringify(workspaceKey)})`);
+  await cdp.call("Page.navigate", { url });
+  await evaluate(cdp, appReadyExpression());
+  const fresh = await evaluate(cdp, `
+    (() => {
+      const actionKeys = ${JSON.stringify(actionKeys)};
+      const workspace = JSON.parse(localStorage.getItem(${JSON.stringify(workspaceKey)}) || "{}");
+      return {
+        lockedBindings: actionKeys.filter((actionKey) => workspace.profiles?.default?.bindings?.[actionKey]?.locked),
+        lockedCards: actionKeys.filter((actionKey) => {
+          const card = Array.from(document.querySelectorAll(".binding-card"))
+            .find((item) => item.textContent.includes(actionKey));
+          return card?.classList.contains("locked-card");
+        }),
+        lockedControlSlots: Array.from(document.querySelectorAll('.stick-panel .slot.locked'))
+          .map((slot) => [slot.dataset.hand || "", slot.dataset.control || ""].join(":")),
+      };
+    })()
+  `);
+  if (fresh.lockedBindings.length || fresh.lockedCards.length || fresh.lockedControlSlots.length) {
+    throw new Error(`Default 6DOF axes and F1/F2/F3 must remain editable: ${JSON.stringify(fresh)}`);
+  }
+
+  await evaluate(cdp, `
+    (() => {
+      const workspace = JSON.parse(localStorage.getItem(${JSON.stringify(workspaceKey)}) || "{}");
+      delete workspace.semanticRevision;
+      const actionKeys = ${JSON.stringify([
+        "v_pitch",
+        "v_roll",
+        "v_yaw",
+        "v_strafe_lateral",
+        "v_strafe_longitudinal",
+        "v_strafe_vertical",
+        "v_toggle_landing_system",
+        "v_toggle_vtol",
+        "v_transform_cycle",
+      ])};
+      for (const actionKey of actionKeys) workspace.profiles.default.bindings[actionKey].locked = true;
+      workspace.profiles.default.bindings.v_pitch.note = "默认 6DOF 轴，保持不变";
+      localStorage.setItem(${JSON.stringify(workspaceKey)}, JSON.stringify(workspace));
+    })()
+  `);
+  await cdp.call("Page.navigate", { url });
+  await evaluate(cdp, appReadyExpression());
+  const migrated = await evaluate(cdp, `
+    (() => {
+      document.querySelector("#toggleCodesBtn").click();
+      const workspace = JSON.parse(localStorage.getItem(${JSON.stringify(workspaceKey)}) || "{}");
+      const actionKeys = ${JSON.stringify([
+        "v_pitch",
+        "v_roll",
+        "v_yaw",
+        "v_strafe_lateral",
+        "v_strafe_longitudinal",
+        "v_strafe_vertical",
+        "v_toggle_landing_system",
+        "v_toggle_vtol",
+        "v_transform_cycle",
+      ])};
+      return {
+        semanticRevision: workspace.semanticRevision,
+        lockedBindings: actionKeys.filter((actionKey) => workspace.profiles?.default?.bindings?.[actionKey]?.locked),
+        lockedCards: Array.from(document.querySelectorAll(".binding-card.locked-card"))
+          .filter((card) => actionKeys.some((actionKey) => card.textContent.includes(actionKey)))
+          .map((card) => card.dataset.rowId || ""),
+        lockedControlSlots: Array.from(document.querySelectorAll('.stick-panel .slot.locked'))
+          .map((slot) => [slot.dataset.hand || "", slot.dataset.control || ""].join(":")),
+        pitchNote: workspace.profiles?.default?.bindings?.v_pitch?.note,
+      };
+    })()
+  `);
+  if (migrated.semanticRevision !== 1
+    || migrated.lockedBindings.length
+    || migrated.lockedCards.length
+    || migrated.lockedControlSlots.length
+    || migrated.pitchNote !== "") {
+    throw new Error(`Legacy default axis and F1/F2/F3 locks must be released once: ${JSON.stringify(migrated)}`);
+  }
+  return { fresh, migrated };
+}
+
+async function verifyUncalibratedBindingIsNotConflictRed(cdp, url) {
+  await evaluate(cdp, `localStorage.removeItem(${JSON.stringify(workspaceKey)})`);
+  await cdp.call("Page.navigate", { url });
+  await evaluate(cdp, appReadyExpression());
+  const result = await evaluate(cdp, `
+    (() => {
+      const click = (selector) => {
+        const element = document.querySelector(selector);
+        if (!element) throw new Error("Missing element: " + selector);
+        element.click();
+      };
+      const clickButton = (container, label) => {
+        const button = Array.from(container.querySelectorAll("button"))
+          .find((item) => item.textContent.trim() === label);
+        if (!button) throw new Error("Missing button: " + label);
+        button.click();
+      };
+
+      click("#gameTab");
+      const search = document.querySelector("#searchInput");
+      search.value = "Activate Scanning";
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+
+      let card = document.querySelector('[data-row-id="game-268"]');
+      if (!card) throw new Error("Activate Scanning card is unavailable");
+      clickButton(card.querySelector(".hand-seg"), "R");
+      card = document.querySelector('[data-row-id="game-268"]');
+      clickButton(card.querySelector(".layer-seg"), "S2");
+      click('#rightPanel .slot[data-control="rapid_fire_push"]');
+
+      click('#rightPanel .slot[data-control="rapid_fire_push"] .code-edit');
+      const shift2Code = document.querySelector('#codeDialogFields input[name="shift2Button"]');
+      if (!shift2Code) throw new Error("RF Push Shift2 code field is unavailable");
+      shift2Code.value = "";
+      click("#saveCodeBtn");
+
+      card = document.querySelector('[data-row-id="game-268"]');
+      const slot = document.querySelector('#rightPanel .slot[data-control="rapid_fire_push"]');
+      return {
+        relationshipType: card?.dataset.relationshipType || "",
+        statusTitle: card?.querySelector(".status-rail")?.title || "",
+        slotPillClass: card?.querySelector(".slot-pill")?.className || "",
+        statusDotClass: card?.querySelector(".status-dot-ui")?.className || "",
+        stickSlotClass: slot?.className || "",
+      };
+    })()
+  `);
+  if (result.relationshipType
+    || result.statusTitle !== "未校准"
+    || !result.slotPillClass.includes("amber")
+    || result.slotPillClass.includes("red")
+    || !result.statusDotClass.includes("amber")
+    || result.statusDotClass.includes("red")
+    || !result.stickSlotClass.includes("uncalibrated")
+    || result.stickSlotClass.includes("conflict")) {
+    throw new Error(`Uncalibrated Activate Scanning binding must warn without conflict red: ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
 async function main() {
   let server;
   let chrome;
@@ -1174,7 +1328,9 @@ async function main() {
     const steps = await evaluate(cdp, pageExpression());
     const responsive = await verifyResponsiveMatrix(cdp, served.url);
     const reducedMotion = await verifyReducedMotion(cdp, served.url);
-    console.log(JSON.stringify({ ok: true, steps, responsive, reducedMotion }, null, 2));
+    const editableControls = await verifyDefaultControlsRemainEditable(cdp, served.url);
+    const uncalibratedBinding = await verifyUncalibratedBindingIsNotConflictRed(cdp, served.url);
+    console.log(JSON.stringify({ ok: true, steps, responsive, reducedMotion, editableControls, uncalibratedBinding }, null, 2));
   } finally {
     if (cdp) cdp.close();
     if (chrome) {

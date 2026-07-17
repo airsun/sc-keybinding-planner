@@ -314,7 +314,7 @@ window.VKB_PLANNER_SEED = {
             "bindable": true,
             "shiftCapable": false,
             "axisCode": "L_AXIS_X",
-            "defaultLocked": true
+            "defaultLocked": false
           },
           {
             "id": "main_y",
@@ -324,7 +324,7 @@ window.VKB_PLANNER_SEED = {
             "bindable": true,
             "shiftCapable": false,
             "axisCode": "L_AXIS_Y",
-            "defaultLocked": true
+            "defaultLocked": false
           },
           {
             "id": "main_twist",
@@ -334,7 +334,7 @@ window.VKB_PLANNER_SEED = {
             "bindable": true,
             "shiftCapable": false,
             "axisCode": "L_AXIS_TWIST",
-            "defaultLocked": true
+            "defaultLocked": false
           },
           {
             "id": "base_f1",
@@ -732,7 +732,7 @@ window.VKB_PLANNER_SEED = {
             "bindable": true,
             "shiftCapable": false,
             "axisCode": "R_AXIS_X",
-            "defaultLocked": true
+            "defaultLocked": false
           },
           {
             "id": "main_y",
@@ -742,7 +742,7 @@ window.VKB_PLANNER_SEED = {
             "bindable": true,
             "shiftCapable": false,
             "axisCode": "R_AXIS_Y",
-            "defaultLocked": true
+            "defaultLocked": false
           },
           {
             "id": "main_twist",
@@ -752,7 +752,7 @@ window.VKB_PLANNER_SEED = {
             "bindable": true,
             "shiftCapable": false,
             "axisCode": "R_AXIS_TWIST",
-            "defaultLocked": true
+            "defaultLocked": false
           },
           {
             "id": "base_f1",
@@ -14513,8 +14513,8 @@ window.VKB_PLANNER_SEED = {
         "control": "main_y"
       },
       "enabled": true,
-      "locked": true,
-      "note": "默认 6DOF 轴，保持不变"
+      "locked": false,
+      "note": ""
     },
     {
       "actionKey": "v_roll",
@@ -14524,8 +14524,8 @@ window.VKB_PLANNER_SEED = {
         "control": "main_x"
       },
       "enabled": true,
-      "locked": true,
-      "note": "默认 6DOF 轴，保持不变"
+      "locked": false,
+      "note": ""
     },
     {
       "actionKey": "v_yaw",
@@ -14535,8 +14535,8 @@ window.VKB_PLANNER_SEED = {
         "control": "main_twist"
       },
       "enabled": true,
-      "locked": true,
-      "note": "默认 6DOF 轴，保持不变"
+      "locked": false,
+      "note": ""
     },
     {
       "actionKey": "v_strafe_lateral",
@@ -14546,8 +14546,8 @@ window.VKB_PLANNER_SEED = {
         "control": "main_x"
       },
       "enabled": true,
-      "locked": true,
-      "note": "默认 6DOF 轴，保持不变"
+      "locked": false,
+      "note": ""
     },
     {
       "actionKey": "v_strafe_longitudinal",
@@ -14557,8 +14557,8 @@ window.VKB_PLANNER_SEED = {
         "control": "main_y"
       },
       "enabled": true,
-      "locked": true,
-      "note": "默认 6DOF 轴，保持不变"
+      "locked": false,
+      "note": ""
     },
     {
       "actionKey": "v_strafe_vertical",
@@ -14568,8 +14568,8 @@ window.VKB_PLANNER_SEED = {
         "control": "main_twist"
       },
       "enabled": true,
-      "locked": true,
-      "note": "默认 6DOF 轴，保持不变"
+      "locked": false,
+      "note": ""
     },
     {
       "actionKey": "v_space_brake",

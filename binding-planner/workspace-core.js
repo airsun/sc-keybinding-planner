@@ -6,6 +6,7 @@
   "use strict";
 
   const WORKSPACE_SCHEMA_VERSION = 4;
+  const WORKSPACE_SEMANTIC_REVISION = 1;
   const DEFAULT_ACTIVATION_MODE = "DEFAULT";
   const DEFAULT_CONTEXT_ID = "global";
   const DEFAULT_CONTEXT_CATALOG = Object.freeze({
@@ -21,6 +22,18 @@
     turret: { id: "turret", label: "Turret", exclusiveGroup: "operator-mode" },
   });
   const CORRUPT_ACTION_KEYS = new Set(["1372"]);
+  const LEGACY_DEFAULT_LOCK_NOTE = "默认 6DOF 轴，保持不变";
+  const LEGACY_DEFAULT_EDITABLE_SLOTS = Object.freeze({
+    v_pitch: { slotType: "axis", hand: "right", control: "main_y" },
+    v_roll: { slotType: "axis", hand: "right", control: "main_x" },
+    v_yaw: { slotType: "axis", hand: "right", control: "main_twist" },
+    v_strafe_lateral: { slotType: "axis", hand: "left", control: "main_x" },
+    v_strafe_longitudinal: { slotType: "axis", hand: "left", control: "main_y" },
+    v_strafe_vertical: { slotType: "axis", hand: "left", control: "main_twist" },
+    v_toggle_landing_system: { slotType: "button", hand: "left", control: "base_f1", layer: "base" },
+    v_toggle_vtol: { slotType: "button", hand: "left", control: "base_f2", layer: "base" },
+    v_transform_cycle: { slotType: "button", hand: "left", control: "base_f3", layer: "base" },
+  });
 
   function clone(value) {
     if (value === undefined) return undefined;
@@ -143,6 +156,23 @@
     };
   }
 
+  function releaseLegacyDefaultControlLock(binding) {
+    const legacySlot = LEGACY_DEFAULT_EDITABLE_SLOTS[binding?.actionKey];
+    if (!legacySlot
+      || binding.locked !== true
+      || binding.slot?.slotType !== legacySlot.slotType
+      || binding.slot?.hand !== legacySlot.hand
+      || binding.slot?.control !== legacySlot.control
+      || (legacySlot.slotType === "button" && (binding.slot?.layer || "base") !== legacySlot.layer)) {
+      return binding;
+    }
+    return {
+      ...binding,
+      locked: false,
+      note: cleanText(binding.note) === LEGACY_DEFAULT_LOCK_NOTE ? "" : binding.note,
+    };
+  }
+
   function normalizeDefaultBindings(bindings, catalog = DEFAULT_CONTEXT_CATALOG) {
     if (Array.isArray(bindings)) {
       return bindings
@@ -212,7 +242,7 @@
     return result;
   }
 
-  function normalizeProfile(profile, fallbackId, catalog) {
+  function normalizeProfile(profile, fallbackId, catalog, options = {}) {
     const next = clone(profile) || {};
     const bindings = {};
     const repairQueue = normalizeRepairQueue(next.repairQueue);
@@ -230,7 +260,11 @@
         continue;
       }
       const normalized = normalizeBinding(binding, key, catalog);
-      if (normalized) bindings[normalized.actionKey] = normalized;
+      if (normalized) {
+        bindings[normalized.actionKey] = options.releaseLegacyDefaultLocks
+          ? releaseLegacyDefaultControlLock(normalized)
+          : normalized;
+      }
     }
 
     return {
@@ -268,10 +302,13 @@
       throw new TypeError(`Unsupported workspace schema: ${source.schemaVersion ?? "missing"}.`);
     }
     const contextCatalog = normalizeContextCatalog(source.contextCatalog);
+    const sourceSemanticRevision = Number(source.semanticRevision) || 0;
     const profilesSource = legacyProfiles(source);
     const profiles = {};
     for (const [key, profile] of Object.entries(profilesSource)) {
-      const normalized = normalizeProfile(profile, key, contextCatalog);
+      const normalized = normalizeProfile(profile, key, contextCatalog, {
+        releaseLegacyDefaultLocks: sourceSemanticRevision < WORKSPACE_SEMANTIC_REVISION,
+      });
       if (normalized.id) profiles[normalized.id] = normalized;
     }
     if (Object.keys(profiles).length === 0) {
@@ -286,6 +323,7 @@
     const result = {
       ...source,
       schemaVersion: WORKSPACE_SCHEMA_VERSION,
+      semanticRevision: WORKSPACE_SEMANTIC_REVISION,
       activeProfileId,
       profiles,
       contextCatalog,
@@ -371,6 +409,7 @@
 
   return Object.freeze({
     WORKSPACE_SCHEMA_VERSION,
+    WORKSPACE_SEMANTIC_REVISION,
     DEFAULT_ACTIVATION_MODE,
     DEFAULT_CONTEXT_CATALOG,
     DEFAULT_CONTEXT_ID,
