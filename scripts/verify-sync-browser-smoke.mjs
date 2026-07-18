@@ -427,6 +427,9 @@ function pageExpression() {
       })(),
       informationPanelCount: document.querySelectorAll(".inline-card-detail .inline-information-panel").length,
       inlineDescription: document.querySelector(".inline-card-detail .inline-description-panel")?.textContent || "",
+      inlineSourceLinkCount: document.querySelectorAll(".inline-card-detail .inline-information-source-link").length,
+      inlineSourceText: Array.from(document.querySelectorAll(".inline-card-detail .inline-information-source-link"))
+        .map((link) => link.textContent || ""),
       inlineNoteDisabled: Boolean(document.querySelector(".inline-card-detail .inline-binding-note")?.disabled),
       inlineNoteValue: document.querySelector(".inline-card-detail .inline-binding-note")?.value || "",
       scenario1BindingNote: workspace.profiles?.default?.bindings?.pc_interaction_select?.note || "",
@@ -738,7 +741,10 @@ function pageExpression() {
     || !state().contextClearVisible
     || !state().balancedSettingsColumns
     || state().informationPanelCount !== 2
-    || !state().inlineDescription.includes("MFD context")
+    || !state().inlineDescription.includes("激活当前 Inner Thought")
+    || state().inlineSourceLinkCount !== 2
+    || !state().inlineSourceText.some((text) => text.includes("Advanced Controls"))
+    || !state().inlineSourceText.some((text) => text.includes("新手交互"))
     || state().inlineNoteDisabled
     || !state().previousDisabled
     || state().detailStatePersisted) {
@@ -794,7 +800,7 @@ function pageExpression() {
     "collapse inline detail",
   );
   await openDetail("scenario-112");
-  if (!state().inlineNoteDisabled || !state().inlineDescription.includes("不上杆")) {
+  if (!state().inlineNoteDisabled || !state().inlineDescription.includes("自毁")) {
     throw new Error("Unbound detail must retain description and disable binding note: " + JSON.stringify(state()));
   }
   click('[data-inline-detail-command="collapse"]');

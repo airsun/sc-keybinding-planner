@@ -2,6 +2,11 @@
   const workspaceCore = window.VKB_WORKSPACE_CORE;
   if (!workspaceCore) throw new Error("Workspace core is unavailable.");
   const seed = workspaceCore.normalizeSeed(window.VKB_PLANNER_SEED);
+  const referenceCatalogById = new Map(
+    (Array.isArray(seed.referenceCatalog) ? seed.referenceCatalog : [])
+      .filter((item) => item?.id && item?.label && item?.url)
+      .map((item) => [item.id, item]),
+  );
   const syncCore = window.VKB_SYNC_CORE;
   const storageKey = "sc-dual-vkb-binding-planner:v1";
   const workspaceSchemaVersion = workspaceCore.WORKSPACE_SCHEMA_VERSION;
@@ -2249,6 +2254,23 @@
       makeEl("span", "inline-information-label", "KEYBINDING DESCRIPTION · 键位说明"),
       makeEl("p", "inline-information-copy", row.description || row.actionText || row.suggestedInput || "暂无键位说明。"),
     );
+    const sources = (Array.isArray(row.sourceRefs) ? row.sourceRefs : [])
+      .map((id) => referenceCatalogById.get(id))
+      .filter(Boolean);
+    if (sources.length) {
+      const sourceLine = makeEl("p", "inline-information-sources");
+      sourceLine.append(document.createTextNode("资料依据："));
+      sources.forEach((source, index) => {
+        if (index) sourceLine.append(document.createTextNode(" · "));
+        const link = makeEl("a", "inline-information-source-link", source.label);
+        link.href = source.url;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        link.addEventListener("click", (event) => event.stopPropagation());
+        sourceLine.append(link);
+      });
+      description.append(sourceLine);
+    }
 
     const note = makeEl("label", "inline-information-panel inline-note-panel");
     note.append(makeEl("span", "inline-information-label", "BINDING NOTE · 绑定备注"));

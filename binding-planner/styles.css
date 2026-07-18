@@ -6932,6 +6932,26 @@ body.help-open {
   overflow-wrap: anywhere;
 }
 
+.inline-information-sources {
+  min-width: 0;
+  margin: 2px 0 0;
+  color: var(--muted);
+  font: 8px/1.45 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.inline-information-source-link {
+  color: #a9e7c5;
+  text-decoration-color: rgba(169, 231, 197, 0.52);
+  text-underline-offset: 2px;
+}
+
+.inline-information-source-link:hover,
+.inline-information-source-link:focus-visible {
+  color: #fff1b8;
+  outline: none;
+}
+
 .inline-binding-note {
   width: 100%;
   min-width: 0;
