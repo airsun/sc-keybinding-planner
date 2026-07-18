@@ -22,8 +22,8 @@ if (!sourceArg || !repairedArg) {
   assert.deepEqual(repaired.deviceConfig, source.deviceConfig);
   assert.deepEqual(repaired.uiSettings, source.uiSettings);
   assert.deepEqual(Object.keys(repaired.profiles), Object.keys(source.profiles));
-  assert.equal(repaired.contextCatalog.global.label, "GLOBAL");
-  assert.equal(repaired.contextCatalog.mining.exclusiveGroup, "operator-mode");
+  assert.equal(repaired.contextCatalog.global.label, "UNSCOPED");
+  assert.equal(repaired.contextCatalog.mining.dimension, "tool-mode");
 
   let activeBindings = 0;
   let repairItems = 0;
@@ -36,7 +36,7 @@ if (!sourceArg || !repairedArg) {
     const expectedActionContexts = {};
     for (const [actionKey, contextIds] of Object.entries(sourceProfile.actionContexts || {})) {
       const normalized = core.normalizeContextIds(contextIds, repaired.contextCatalog);
-      if (!(normalized.length === 1 && normalized[0] === core.DEFAULT_CONTEXT_ID)) {
+      if (!core.isDefaultContextIds(normalized, repaired.contextCatalog)) {
         expectedActionContexts[actionKey] = normalized;
       }
     }

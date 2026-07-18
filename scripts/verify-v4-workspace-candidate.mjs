@@ -74,7 +74,7 @@ for (const [profileId, sourceProfile] of Object.entries(sourceV4.profiles)) {
     } else {
       assert.equal(profile.actionModes[actionKey], binding.activationMode);
     }
-    if (binding.contextIds.length === 1 && binding.contextIds[0] === core.DEFAULT_CONTEXT_ID) {
+    if (core.isDefaultContextIds(binding.contextIds, candidateV4.contextCatalog)) {
       assert.equal(profile.actionContexts[actionKey], undefined);
     } else {
       assert.deepEqual(profile.actionContexts[actionKey], binding.contextIds);

@@ -1,36 +1,36 @@
 ## ADDED Requirements
 
 ### Requirement: Workspace provides an explicit CTX catalog
-The system SHALL persist a context catalog whose entries have stable ids, display labels, and optional exclusive-group ids.
+The system SHALL persist a context catalog whose entries have stable ids, display labels, and an optional Position, Tool Mode, or Focus dimension.
 
 #### Scenario: Workspace lacks a context catalog
 - **WHEN** a v1, v2, or v3 workspace is migrated
 - **THEN** schema v4 adds the built-in CTX catalog without changing `deviceConfig` or Profile identity
 
 ### Requirement: Every action has a CTX assignment
-The system SHALL expose a CTX setting for bound and unbound actions inside each Profile, defaulting to `GLOBAL` when no explicit assignment exists.
+The system SHALL expose a CTX setting for bound and unbound actions inside each Profile, defaulting to `Pilot + Vehicle Weapons + Normal` when no explicit assignment exists.
 
 #### Scenario: Existing binding is migrated
 - **WHEN** a binding has no `contextIds`
-- **THEN** migration stores `contextIds: ["global"]`
+- **THEN** migration stores the default Position, Tool Mode, and Focus assignment
 
 #### Scenario: Unbound action CTX is selected
 - **WHEN** the user selects CTX values before assigning a physical slot
 - **THEN** the Profile stores those values and copies them to the binding when the action is assigned
 
 ### Requirement: CTX exclusivity is conservative
-The system SHALL consider two context sets mutually exclusive only when every cross-set pair belongs to the same explicit exclusive group and uses different context ids.
+The system SHALL consider two context sets mutually exclusive only when both sets explicitly select different values in at least one shared dimension. Missing dimensions and `UNSCOPED` remain wildcards and cannot prove reuse.
 
 #### Scenario: Mining and Salvage share one exclusive group
 - **WHEN** two different actions use the same slot and activation mode with CTX `Mining` and `Salvage`
 - **THEN** the relationship is `context-reuse`
 
-#### Scenario: GLOBAL overlaps a specific context
-- **WHEN** one action uses `GLOBAL` and another uses `Mining`
+#### Scenario: UNSCOPED overlaps a specific context
+- **WHEN** one action uses `UNSCOPED` and another uses `Mining`
 - **THEN** the relationship remains `true-conflict`
 
 #### Scenario: Context evidence is incomplete
-- **WHEN** the selected context sets overlap, use different exclusive groups, or contain unknown ids
+- **WHEN** the selected context sets have no shared dimension, select the same value in every shared dimension, or contain unknown ids
 - **THEN** the relationship remains `true-conflict`
 
 ### Requirement: Canonical actions are shared
@@ -74,15 +74,34 @@ The system SHALL restrict red conflict styling, problem filtering, locked-occupa
 - **THEN** the existing locked-conflict protection remains active
 
 ### Requirement: CTX is edited in the operation card
-The system SHALL provide a compact per-action CTX control beside MODE and apply changes without navigating to a separate settings page.
+The system SHALL provide an always-visible grouped per-action CTX control beside MODE and apply changes without navigating to a separate settings page.
 
 #### Scenario: User applies multiple CTX values
 - **WHEN** the user opens the CTX control, selects one or more specific contexts, and applies
 - **THEN** the Profile stores the normalized context ids and the mini-card classification updates immediately
 
-#### Scenario: User selects GLOBAL
-- **WHEN** the user selects `GLOBAL`
-- **THEN** specific context selections are cleared and the action is treated as potentially active everywhere
+#### Scenario: User clears CTX
+- **WHEN** the user activates `CLEAR CTX · UNSCOPED`
+- **THEN** dimension selections are cleared and the action is treated as potentially active everywhere
+
+### Requirement: Expanded MODE and CTX controls are balanced
+The system SHALL render MODE and CTX as equal-weight columns in the expanded operation card.
+
+#### Scenario: User expands an operation card
+- **WHEN** the detail region opens
+- **THEN** all supported MODE values are visible without a dropdown and each value shows both its abbreviation and full name
+- **AND** CTX values are grouped under Position, Tool Mode, and Focus with one directly clickable option per value
+
+### Requirement: Expanded card distinguishes description and binding note
+The system SHALL show the action description as read-only reference content and the current binding note as a separate editable field.
+
+#### Scenario: Bound action detail is open
+- **WHEN** the user edits the binding note
+- **THEN** the note is persisted on that binding in the active Profile and synchronized with existing note controls
+
+#### Scenario: Unbound action detail is open
+- **WHEN** no binding exists for the action
+- **THEN** the description remains visible and the note field clearly indicates that a binding is required
 
 ### Requirement: Workspace is bounded across target displays
 The system SHALL provide explicit responsive workspace modes for phone, iPad Pro portrait, iPad Pro landscape or Sidecar, 2K, and 4K displays without viewport-dependent font scaling.

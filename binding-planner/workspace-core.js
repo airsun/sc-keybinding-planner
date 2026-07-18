@@ -6,20 +6,29 @@
   "use strict";
 
   const WORKSPACE_SCHEMA_VERSION = 4;
-  const WORKSPACE_SEMANTIC_REVISION = 1;
+  const WORKSPACE_SEMANTIC_REVISION = 2;
   const DEFAULT_ACTIVATION_MODE = "DEFAULT";
-  const DEFAULT_CONTEXT_ID = "global";
+  const UNSCOPED_CONTEXT_ID = "global";
+  const DEFAULT_CONTEXT_ID = UNSCOPED_CONTEXT_ID;
+  const DEFAULT_CONTEXT_IDS = Object.freeze(["pilot", "vehicle-weapons", "normal"]);
   const DEFAULT_CONTEXT_CATALOG = Object.freeze({
-    global: { id: "global", label: "GLOBAL", exclusiveGroup: "" },
-    "on-foot": { id: "on-foot", label: "On Foot", exclusiveGroup: "control-domain" },
-    vehicle: { id: "vehicle", label: "Vehicle", exclusiveGroup: "control-domain" },
-    interaction: { id: "interaction", label: "Interaction", exclusiveGroup: "interaction-layer" },
-    mfd: { id: "mfd", label: "MFD", exclusiveGroup: "interaction-layer" },
-    flight: { id: "flight", label: "Flight", exclusiveGroup: "operator-mode" },
-    missile: { id: "missile", label: "Missile", exclusiveGroup: "operator-mode" },
-    mining: { id: "mining", label: "Mining", exclusiveGroup: "operator-mode" },
-    salvage: { id: "salvage", label: "Salvage", exclusiveGroup: "operator-mode" },
-    turret: { id: "turret", label: "Turret", exclusiveGroup: "operator-mode" },
+    global: { id: "global", label: "UNSCOPED", dimension: "", exclusiveGroup: "" },
+    pilot: { id: "pilot", label: "Pilot", dimension: "position", exclusiveGroup: "position" },
+    turret: { id: "turret", label: "Turret", dimension: "position", exclusiveGroup: "position" },
+    "ground-vehicle": { id: "ground-vehicle", label: "Ground Vehicle", dimension: "position", exclusiveGroup: "position" },
+    eva: { id: "eva", label: "EVA", dimension: "position", exclusiveGroup: "position" },
+    "on-foot": { id: "on-foot", label: "On Foot", dimension: "position", exclusiveGroup: "position" },
+    "vehicle-weapons": { id: "vehicle-weapons", label: "Vehicle Weapons", dimension: "tool-mode", exclusiveGroup: "tool-mode" },
+    missile: { id: "missile", label: "Missile", dimension: "tool-mode", exclusiveGroup: "tool-mode" },
+    mining: { id: "mining", label: "Mining", dimension: "tool-mode", exclusiveGroup: "tool-mode" },
+    salvage: { id: "salvage", label: "Salvage", dimension: "tool-mode", exclusiveGroup: "tool-mode" },
+    normal: { id: "normal", label: "Normal", dimension: "focus", exclusiveGroup: "focus" },
+    interaction: { id: "interaction", label: "Interaction", dimension: "focus", exclusiveGroup: "focus" },
+    mfd: { id: "mfd", label: "MFD", dimension: "focus", exclusiveGroup: "focus" },
+  });
+  const LEGACY_CONTEXT_ID_MAP = Object.freeze({
+    flight: "pilot",
+    vehicle: "ground-vehicle",
   });
   const CORRUPT_ACTION_KEYS = new Set(["1372"]);
   const LEGACY_DEFAULT_LOCK_NOTE = "默认 6DOF 轴，保持不变";
@@ -63,12 +72,15 @@
   function normalizeContextCatalog(value) {
     const result = clone(DEFAULT_CONTEXT_CATALOG);
     for (const [key, entry] of Object.entries(value || {})) {
-      const id = cleanText(entry?.id || key).toLowerCase();
+      const sourceId = cleanText(entry?.id || key).toLowerCase();
+      const id = LEGACY_CONTEXT_ID_MAP[sourceId] || sourceId;
       if (!id) continue;
+      if (Object.hasOwn(DEFAULT_CONTEXT_CATALOG, id)) continue;
       result[id] = {
         id,
         label: cleanText(entry?.label) || id,
         exclusiveGroup: cleanText(entry?.exclusiveGroup),
+        dimension: cleanText(entry?.dimension || entry?.exclusiveGroup),
       };
     }
     return result;
@@ -78,29 +90,52 @@
     const normalizedCatalog = normalizeContextCatalog(catalog);
     const source = Array.isArray(value) ? value : value ? [value] : [];
     const result = [];
+    const dimensions = new Set();
     for (const item of source) {
-      const id = cleanText(item).toLowerCase();
+      const sourceId = cleanText(item).toLowerCase();
+      const id = LEGACY_CONTEXT_ID_MAP[sourceId] || sourceId;
       if (!normalizedCatalog[id] || result.includes(id)) continue;
+      if (id === UNSCOPED_CONTEXT_ID) return [UNSCOPED_CONTEXT_ID];
+      const dimension = cleanText(
+        normalizedCatalog[id].dimension || normalizedCatalog[id].exclusiveGroup,
+      );
+      if (dimension && dimensions.has(dimension)) continue;
       result.push(id);
+      if (dimension) dimensions.add(dimension);
     }
-    if (!result.length || result.includes(DEFAULT_CONTEXT_ID)) return [DEFAULT_CONTEXT_ID];
-    return result;
+    if (!result.length) return clone(DEFAULT_CONTEXT_IDS);
+    const order = new Map(Object.keys(normalizedCatalog).map((id, index) => [id, index]));
+    return result.sort((left, right) => (order.get(left) ?? 9999) - (order.get(right) ?? 9999));
+  }
+
+  function isDefaultContextIds(value, catalog = DEFAULT_CONTEXT_CATALOG) {
+    const normalized = normalizeContextIds(value, catalog);
+    return normalized.length === DEFAULT_CONTEXT_IDS.length
+      && DEFAULT_CONTEXT_IDS.every((id) => normalized.includes(id));
+  }
+
+  function migrateLegacyContextIds(value, catalog = DEFAULT_CONTEXT_CATALOG) {
+    const source = Array.isArray(value) ? value : value ? [value] : [];
+    if (!source.length || source.some((id) => cleanText(id).toLowerCase() === UNSCOPED_CONTEXT_ID)) {
+      return clone(DEFAULT_CONTEXT_IDS);
+    }
+    return normalizeContextIds(source, catalog);
   }
 
   function areContextSetsExclusive(left, right, catalog = DEFAULT_CONTEXT_CATALOG) {
     const normalizedCatalog = normalizeContextCatalog(catalog);
     const leftIds = normalizeContextIds(left, normalizedCatalog);
     const rightIds = normalizeContextIds(right, normalizedCatalog);
-    if (leftIds.includes(DEFAULT_CONTEXT_ID) || rightIds.includes(DEFAULT_CONTEXT_ID)) return false;
-    return leftIds.every((leftId) => rightIds.every((rightId) => {
-      const leftEntry = normalizedCatalog[leftId];
-      const rightEntry = normalizedCatalog[rightId];
-      return Boolean(
-        leftId !== rightId &&
-        leftEntry?.exclusiveGroup &&
-        leftEntry.exclusiveGroup === rightEntry?.exclusiveGroup,
-      );
-    }));
+    if (leftIds.includes(UNSCOPED_CONTEXT_ID) || rightIds.includes(UNSCOPED_CONTEXT_ID)) return false;
+    const byDimension = (ids) => new Map(ids.map((id) => {
+      const entry = normalizedCatalog[id];
+      return [cleanText(entry?.dimension || entry?.exclusiveGroup), id];
+    }).filter(([dimension]) => dimension));
+    const leftDimensions = byDimension(leftIds);
+    const rightDimensions = byDimension(rightIds);
+    return Array.from(leftDimensions).some(([dimension, leftId]) => (
+      rightDimensions.has(dimension) && rightDimensions.get(dimension) !== leftId
+    ));
   }
 
   function slug(value) {
@@ -144,15 +179,18 @@
     });
   }
 
-  function normalizeBinding(binding, fallbackActionKeyValue, catalog = DEFAULT_CONTEXT_CATALOG) {
+  function normalizeBinding(binding, fallbackActionKeyValue, catalog = DEFAULT_CONTEXT_CATALOG, options = {}) {
     const next = clone(binding) || {};
     const requestedKey = cleanText(next.actionKey || fallbackActionKeyValue);
     if (!isValidActionKey(requestedKey)) return null;
+    const normalizeContexts = options.migrateLegacyContexts
+      ? migrateLegacyContextIds
+      : normalizeContextIds;
     return {
       ...next,
       actionKey: requestedKey,
       activationMode: normalizeActivationMode(next.activationMode),
-      contextIds: normalizeContextIds(next.contextIds, catalog),
+      contextIds: normalizeContexts(next.contextIds, catalog),
     };
   }
 
@@ -230,12 +268,15 @@
     return result;
   }
 
-  function normalizeActionContexts(actionContexts, catalog) {
+  function normalizeActionContexts(actionContexts, catalog, options = {}) {
     const result = {};
+    const normalizeContexts = options.migrateLegacyContexts
+      ? migrateLegacyContextIds
+      : normalizeContextIds;
     for (const [actionKey, contextIds] of Object.entries(actionContexts || {})) {
       if (!isValidActionKey(actionKey)) continue;
-      const normalized = normalizeContextIds(contextIds, catalog);
-      if (!(normalized.length === 1 && normalized[0] === DEFAULT_CONTEXT_ID)) {
+      const normalized = normalizeContexts(contextIds, catalog);
+      if (!isDefaultContextIds(normalized, catalog)) {
         result[actionKey] = normalized;
       }
     }
@@ -259,7 +300,7 @@
         }
         continue;
       }
-      const normalized = normalizeBinding(binding, key, catalog);
+      const normalized = normalizeBinding(binding, key, catalog, options);
       if (normalized) {
         bindings[normalized.actionKey] = options.releaseLegacyDefaultLocks
           ? releaseLegacyDefaultControlLock(normalized)
@@ -273,7 +314,7 @@
       bindings,
       repairQueue,
       actionModes: normalizeActionModes(next.actionModes),
-      actionContexts: normalizeActionContexts(next.actionContexts, catalog),
+      actionContexts: normalizeActionContexts(next.actionContexts, catalog, options),
     };
   }
 
@@ -307,7 +348,8 @@
     const profiles = {};
     for (const [key, profile] of Object.entries(profilesSource)) {
       const normalized = normalizeProfile(profile, key, contextCatalog, {
-        releaseLegacyDefaultLocks: sourceSemanticRevision < WORKSPACE_SEMANTIC_REVISION,
+        releaseLegacyDefaultLocks: sourceSemanticRevision < 1,
+        migrateLegacyContexts: sourceSemanticRevision < 2,
       });
       if (normalized.id) profiles[normalized.id] = normalized;
     }
@@ -373,7 +415,7 @@
       profile.actionModes[actionKey] = activationMode;
     }
     const contextIds = profile.bindings[actionKey].contextIds;
-    if (contextIds.length === 1 && contextIds[0] === DEFAULT_CONTEXT_ID) {
+    if (isDefaultContextIds(contextIds, workspace.contextCatalog)) {
       delete profile.actionContexts[actionKey];
     } else {
       profile.actionContexts[actionKey] = clone(contextIds);
@@ -413,10 +455,13 @@
     DEFAULT_ACTIVATION_MODE,
     DEFAULT_CONTEXT_CATALOG,
     DEFAULT_CONTEXT_ID,
+    DEFAULT_CONTEXT_IDS,
+    UNSCOPED_CONTEXT_ID,
     areContextSetsExclusive,
     bindingConflictKey,
     classifyBindingRelationship,
     isNumericPlaceholder,
+    isDefaultContextIds,
     migrateWorkspace,
     normalizeActivationMode,
     normalizeContextIds,

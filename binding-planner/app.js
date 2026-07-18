@@ -6,10 +6,6 @@
   const storageKey = "sc-dual-vkb-binding-planner:v1";
   const workspaceSchemaVersion = workspaceCore.WORKSPACE_SCHEMA_VERSION;
   const workspaceSemanticRevision = workspaceCore.WORKSPACE_SEMANTIC_REVISION;
-  const activationModes = [
-    workspaceCore.DEFAULT_ACTIVATION_MODE,
-    ...new Set([...seed.gameRows, ...seed.scenarioRows].map((row) => row.activationMode)),
-  ].filter((mode, index, values) => mode && values.indexOf(mode) === index);
   const activationModeBadgeLabels = Object.freeze({
     DEFAULT: "DEF",
     TAP: "TAP",
@@ -25,6 +21,15 @@
     DELAYED_HOLD: "D-H",
     DELAYED_HOLD_NO_RETRIGGER: "DHN",
   });
+  const activationModes = [
+    ...Object.keys(activationModeBadgeLabels),
+    ...new Set([...seed.gameRows, ...seed.scenarioRows].map((row) => row.activationMode)),
+  ].filter((mode, index, values) => mode && values.indexOf(mode) === index);
+  const contextDimensions = Object.freeze([
+    { id: "position", label: "POSITION", description: "操作位置" },
+    { id: "tool-mode", label: "TOOL MODE", description: "工具模式" },
+    { id: "focus", label: "FOCUS", description: "交互焦点" },
+  ]);
   const layers = ["base", "shift1", "shift2"];
   const layerLabels = { base: "Base", shift1: "S1", shift2: "S2" };
   const handLabels = { left: "左杆", right: "右杆" };
@@ -1070,7 +1075,7 @@
       return false;
     }
     const normalized = workspaceCore.normalizeContextIds(contextIds, state.contextCatalog);
-    if (normalized.length === 1 && normalized[0] === workspaceCore.DEFAULT_CONTEXT_ID) {
+    if (workspaceCore.isDefaultContextIds(normalized, state.contextCatalog)) {
       delete profile.actionContexts[row.actionKey];
     } else {
       profile.actionContexts[row.actionKey] = clone(normalized);
@@ -1802,14 +1807,15 @@
 
     const body = makeEl("div", "inline-detail-body");
     const settings = makeEl("div", "inline-detail-settings");
-    settings.append(renderActivationModeSelect(row), renderContextPicker(row));
+    settings.append(renderActivationModePicker(row), renderContextPicker(row));
+    const information = renderInlineBindingInformation(row, binding);
     const relationship = makeEl("div", "inline-detail-relationship");
     if (binding?.slot && status.relationship) {
       relationship.append(renderRelationshipMiniCard(row, binding, status));
     } else {
       relationship.append(makeEl("span", "inline-detail-empty", "当前键位无共享、CTX 复用或冲突关系。"));
     }
-    body.append(settings, relationship);
+    body.append(settings, information, relationship);
     detail.append(header, body);
     return detail;
   }
@@ -1934,30 +1940,49 @@
     return consoleEl;
   }
 
-  function renderActivationModeSelect(row) {
-    const wrap = makeEl("label", "activation-mode-field");
-    wrap.append(makeEl("span", "activation-mode-label", "MODE"));
-    const select = makeEl("select", "activation-mode-select");
-    select.setAttribute("aria-label", `${row.nameZh || row.nameEn || row.actionKey} 触发模式`);
-    for (const mode of activationModes) {
-      const option = document.createElement("option");
-      option.value = mode;
-      option.textContent = mode;
-      select.append(option);
-    }
-    select.value = activationModeForRow(row);
-    select.addEventListener("click", (event) => event.stopPropagation());
-    select.addEventListener("change", (event) => {
-      event.stopPropagation();
-      setRowActivationMode(row, event.target.value);
-    });
+  function activationModeFullLabel(mode) {
+    return workspaceCore.normalizeActivationMode(mode).replace(/_/g, " ");
+  }
+
+  function renderActivationModePicker(row) {
+    const wrap = makeEl("fieldset", "activation-mode-field");
     wrap.addEventListener("click", (event) => event.stopPropagation());
-    wrap.append(select);
+    wrap.append(makeEl("legend", "activation-mode-label", "MODE"));
+    const heading = makeEl("div", "activation-mode-heading");
+    heading.append(
+      makeEl("strong", "activation-mode-title", "触发方式"),
+      makeEl("output", "activation-mode-summary", `${modeBadgeLabel(activationModeForRow(row))} · ${activationModeFullLabel(activationModeForRow(row))}`),
+    );
+    const options = makeEl("div", "activation-mode-grid");
+    options.setAttribute("role", "radiogroup");
+    options.setAttribute("aria-label", `${row.nameZh || row.nameEn || row.actionKey} 触发模式`);
+    const currentMode = activationModeForRow(row);
+    for (const mode of activationModes) {
+      const option = makeEl("button", "activation-mode-option");
+      option.type = "button";
+      option.dataset.mode = mode;
+      option.setAttribute("role", "radio");
+      option.setAttribute("aria-checked", String(mode === currentMode));
+      option.setAttribute("aria-pressed", String(mode === currentMode));
+      option.setAttribute("aria-label", `${modeBadgeLabel(mode)} ${activationModeFullLabel(mode)}`);
+      option.append(
+        makeEl("strong", "activation-mode-abbr", modeBadgeLabel(mode)),
+        makeEl("span", "activation-mode-name", activationModeFullLabel(mode)),
+      );
+      option.addEventListener("click", (event) => {
+        event.stopPropagation();
+        setRowActivationMode(row, mode);
+      });
+      options.append(option);
+    }
+    wrap.append(heading, options);
     return wrap;
   }
 
-  function contextEntries() {
-    return Object.values(state.contextCatalog || workspaceCore.DEFAULT_CONTEXT_CATALOG);
+  function contextEntries(dimension = "") {
+    return Object.values(state.contextCatalog || workspaceCore.DEFAULT_CONTEXT_CATALOG)
+      .filter((entry) => entry.id !== workspaceCore.UNSCOPED_CONTEXT_ID)
+      .filter((entry) => !dimension || (entry.dimension || entry.exclusiveGroup) === dimension);
   }
 
   function contextLabels(contextIds) {
@@ -1971,70 +1996,130 @@
     return `${labels.length} CTX`;
   }
 
+  function toggledContextIds(row, contextId) {
+    if (contextId === workspaceCore.UNSCOPED_CONTEXT_ID) return [workspaceCore.UNSCOPED_CONTEXT_ID];
+    const current = contextIdsForRow(row);
+    const selected = current.includes(workspaceCore.UNSCOPED_CONTEXT_ID)
+      ? [...workspaceCore.DEFAULT_CONTEXT_IDS]
+      : current.filter((id) => id !== workspaceCore.UNSCOPED_CONTEXT_ID);
+    const dimension = state.contextCatalog[contextId]?.dimension
+      || state.contextCatalog[contextId]?.exclusiveGroup
+      || "";
+    const isSelected = selected.includes(contextId);
+    const next = selected.filter((id) => {
+      if (id === contextId) return false;
+      const entry = state.contextCatalog[id];
+      return !dimension || (entry?.dimension || entry?.exclusiveGroup) !== dimension;
+    });
+    if (!isSelected) next.push(contextId);
+    return next.length ? next : [workspaceCore.UNSCOPED_CONTEXT_ID];
+  }
+
   function renderContextPicker(row) {
-    const picker = makeEl("div", "context-picker");
+    const picker = makeEl("fieldset", "context-picker");
+    picker.tabIndex = -1;
     picker.addEventListener("click", (event) => event.stopPropagation());
-    picker.append(makeEl("span", "context-picker-label", "CTX"));
-    const button = makeEl("button", "context-picker-button", contextSummary(row));
-    button.type = "button";
-    button.setAttribute("aria-label", `${row.nameZh || row.nameEn || row.actionKey} CTX`);
-    button.setAttribute("aria-expanded", "false");
-
-    const panel = makeEl("div", "context-picker-panel");
+    const legend = makeEl("legend", "context-picker-label", "CTX");
+    const heading = makeEl("div", "context-picker-heading");
+    const title = makeEl("strong", "context-picker-title", "生效上下文");
+    const summary = makeEl("output", "context-picker-summary", contextSummary(row));
+    summary.setAttribute("aria-label", "当前 CTX");
+    heading.append(title, summary);
+    const hint = makeEl("span", "context-picker-hint", "每个维度最多选择一项；点击后立即保存");
+    const groups = makeEl("div", "context-dimension-list");
     const selected = new Set(contextIdsForRow(row));
-    for (const entry of contextEntries()) {
-      const label = makeEl("label", "context-option");
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.value = entry.id;
-      checkbox.checked = selected.has(entry.id);
-      checkbox.addEventListener("change", () => {
-        const checkboxes = Array.from(panel.querySelectorAll('input[type="checkbox"]'));
-        if (checkbox.checked && checkbox.value === workspaceCore.DEFAULT_CONTEXT_ID) {
-          for (const item of checkboxes) item.checked = item === checkbox;
-        } else if (checkbox.checked) {
-          const global = checkboxes.find((item) => item.value === workspaceCore.DEFAULT_CONTEXT_ID);
-          if (global) global.checked = false;
-        }
-      });
-      const copy = makeEl("span", "context-option-copy");
-      copy.append(makeEl("strong", "", entry.label));
-      if (entry.exclusiveGroup) copy.append(makeEl("small", "", entry.exclusiveGroup));
-      label.append(checkbox, copy);
-      panel.append(label);
+    for (const dimension of contextDimensions) {
+      const group = makeEl("section", "context-dimension");
+      group.dataset.contextDimension = dimension.id;
+      const groupHeading = makeEl("div", "context-dimension-heading");
+      groupHeading.append(
+        makeEl("strong", "", dimension.label),
+        makeEl("small", "", dimension.description),
+      );
+      const options = makeEl("div", "context-option-grid");
+      options.setAttribute("role", "radiogroup");
+      options.setAttribute("aria-label", `${row.nameZh || row.nameEn || row.actionKey} ${dimension.label} CTX`);
+      for (const entry of contextEntries(dimension.id)) {
+        const option = makeEl("button", "context-option");
+        option.type = "button";
+        option.dataset.contextId = entry.id;
+        option.setAttribute("role", "radio");
+        option.setAttribute("aria-checked", String(selected.has(entry.id)));
+        option.setAttribute("aria-pressed", String(selected.has(entry.id)));
+        option.setAttribute("aria-label", `${selected.has(entry.id) ? "移除" : "选择"} CTX ${entry.label}`);
+        option.append(
+          makeEl("span", "context-option-indicator", selected.has(entry.id) ? "●" : "○"),
+          makeEl("strong", "context-option-name", entry.label),
+        );
+        option.addEventListener("click", (event) => {
+          event.stopPropagation();
+          setRowContexts(row, toggledContextIds(row, entry.id));
+        });
+        options.append(option);
+      }
+      group.append(groupHeading, options);
+      groups.append(group);
     }
-
-    const actions = makeEl("div", "context-picker-actions");
-    const close = makeEl("button", "", "关闭");
-    close.type = "button";
-    close.addEventListener("click", () => {
-      picker.classList.remove("open");
-      button.setAttribute("aria-expanded", "false");
+    const clear = makeEl("button", "context-clear");
+    clear.type = "button";
+    clear.dataset.contextId = workspaceCore.UNSCOPED_CONTEXT_ID;
+    clear.setAttribute("aria-pressed", String(selected.has(workspaceCore.UNSCOPED_CONTEXT_ID)));
+    clear.setAttribute("aria-label", "清除 CTX，设为 UNSCOPED");
+    clear.append(
+      makeEl("strong", "", "CLEAR CTX"),
+      makeEl("span", "", "UNSCOPED"),
+    );
+    clear.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setRowContexts(row, [workspaceCore.UNSCOPED_CONTEXT_ID]);
     });
-    const apply = makeEl("button", "primary", "应用");
-    apply.type = "button";
-    apply.addEventListener("click", () => {
-      const contextIds = Array.from(panel.querySelectorAll('input[type="checkbox"]:checked'))
-        .map((input) => input.value);
-      setRowContexts(row, contextIds);
-    });
-    actions.append(close, apply);
-    panel.append(actions);
-
-    button.addEventListener("click", () => {
-      const isOpen = picker.classList.toggle("open");
-      button.setAttribute("aria-expanded", String(isOpen));
-    });
-    picker.append(button, panel);
+    picker.append(legend, heading, hint, groups, clear);
     return picker;
   }
 
+  function renderInlineBindingInformation(row, binding) {
+    const information = makeEl("div", "inline-detail-information");
+    const description = makeEl("section", "inline-information-panel inline-description-panel");
+    description.append(
+      makeEl("span", "inline-information-label", "KEYBINDING DESCRIPTION · 键位说明"),
+      makeEl("p", "inline-information-copy", row.description || row.actionText || row.suggestedInput || "暂无键位说明。"),
+    );
+
+    const note = makeEl("label", "inline-information-panel inline-note-panel");
+    note.append(makeEl("span", "inline-information-label", "BINDING NOTE · 绑定备注"));
+    const input = makeEl("textarea", "inline-binding-note");
+    input.rows = 3;
+    input.value = binding?.note || "";
+    input.disabled = !binding;
+    input.placeholder = binding ? "为当前 Profile 中的这个绑定添加备注" : "请先绑定键位，再填写绑定备注";
+    input.setAttribute("aria-label", `${row.nameZh || row.nameEn || row.actionKey} 绑定备注`);
+    input.addEventListener("click", (event) => event.stopPropagation());
+    input.addEventListener("input", (event) => {
+      updateRowNote(row, event.target.value, { syncSelection: row.id === selectedRowId });
+    });
+    input.addEventListener("change", (event) => {
+      updateRowNote(row, event.target.value, {
+        syncSelection: row.id === selectedRowId,
+        renderRowsAfter: true,
+      });
+    });
+    note.append(input);
+    information.append(description, note);
+    return information;
+  }
+
+  function focusContextPickerForRow(rowId) {
+    const picker = dom.rows.querySelector(`[data-row-id="${rowId}"] .inline-card-detail .context-picker`);
+    if (!picker) return false;
+    picker.focus({ preventScroll: true });
+    picker.classList.remove("attention");
+    window.requestAnimationFrame(() => picker.classList.add("attention"));
+    picker.addEventListener("animationend", () => picker.classList.remove("attention"), { once: true });
+    return true;
+  }
+
   function openContextPickerForRow(rowId) {
-    const expandedPicker = dom.rows.querySelector(`[data-row-id="${rowId}"] .inline-card-detail .context-picker-button`);
-    if (expandedPicker) {
-      expandedPicker.click();
-      return;
-    }
+    if (focusContextPickerForRow(rowId)) return;
     const row = findRow(rowId);
     if (!row) return;
     expandedRowId = row.id;
@@ -2044,7 +2129,7 @@
     pendingExpandedScrollRowId = row.id;
     focusBinding(row);
     window.requestAnimationFrame(() => {
-      dom.rows.querySelector(`[data-row-id="${rowId}"] .inline-card-detail .context-picker-button`)?.click();
+      focusContextPickerForRow(rowId);
     });
   }
 

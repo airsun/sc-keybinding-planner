@@ -11,11 +11,11 @@ const core = require("../binding-planner/workspace-core.js");
 const CONTEXT_BY_ACTION = Object.freeze({
   "pc_interaction_select": "interaction",
   "scenario:2:item": "interaction",
-  "scenario:61:operator-mode": "flight",
-  "v_eject": "flight",
-  "v_emergency_exit": "flight",
-  "v_ifcs_toggle_esp": "flight",
-  "v_master_mode_cycle": "flight",
+  "scenario:61:operator-mode": "pilot",
+  "v_eject": "pilot",
+  "v_emergency_exit": "pilot",
+  "v_ifcs_toggle_esp": "pilot",
+  "v_master_mode_cycle": "pilot",
   "v_mfd_movement_up_short": "mfd",
   "v_mfd_soft_select_mfd_primary_short": "mfd",
   "v_mining_throttle": "mining",
@@ -28,23 +28,23 @@ const CONTEXT_BY_ACTION = Object.freeze({
   "v_salvage_toggle_gimbal_mode": "salvage",
   "v_set_mining_mode": "mining",
   "v_set_salvage_mode": "salvage",
-  "v_speed_range_abs": "flight",
-  "v_target_cycle_subitem_fwd": "flight",
-  "v_toggle_landing_system": "flight",
+  "v_speed_range_abs": "pilot",
+  "v_target_cycle_subitem_fwd": "pilot",
+  "v_toggle_landing_system": "pilot",
   "v_toggle_mining_laser_fire": "mining",
   "v_toggle_mining_laser_type": "mining",
   "v_toggle_mining_mode": "mining",
   "v_toggle_salvage_mode": "salvage",
-  "v_transform_cycle": "flight",
+  "v_transform_cycle": "pilot",
   "v_ui_prev_scan_page": "mfd",
   "v_weapon_bombing_hud_range_reset": "missile",
-  "v_weapon_convergence_distance_rel_decrease": "flight",
+  "v_weapon_convergence_distance_rel_decrease": "pilot",
   "v_weapon_cycle_missile_fwd": "missile",
   "v_weapon_launch_missile": "missile",
   "v_weapon_launch_missile_cinematic": "missile",
-  "v_weapon_preset_fire_guns0": "flight",
-  "v_weapon_preset_fire_guns2": "flight",
-  "v_weapon_preset_next": "flight",
+  "v_weapon_preset_fire_guns0": "pilot",
+  "v_weapon_preset_fire_guns2": "pilot",
+  "v_weapon_preset_next": "pilot",
   "v_weapon_toggle_launch_missile": "missile",
 });
 
@@ -149,6 +149,18 @@ if (missingContextMappings.length) {
 const inferredModeAssignments = {};
 const explicitModeAssignments = {};
 const contextAssignments = {};
+function completeContextIds(contextId, catalog) {
+  const entry = catalog[contextId];
+  const dimension = entry?.dimension || entry?.exclusiveGroup || "";
+  if (!dimension) return core.normalizeContextIds([contextId], catalog);
+  const next = core.DEFAULT_CONTEXT_IDS.filter((id) => {
+    const defaultEntry = catalog[id];
+    return (defaultEntry?.dimension || defaultEntry?.exclusiveGroup || "") !== dimension;
+  });
+  next.push(contextId);
+  return core.normalizeContextIds(next, catalog);
+}
+
 for (const [profileId, profile] of Object.entries(workspace.profiles)) {
   profile.actionModes ||= {};
   profile.actionContexts ||= {};
@@ -157,9 +169,14 @@ for (const [profileId, profile] of Object.entries(workspace.profiles)) {
     if (!binding) continue;
 
     const contextId = CONTEXT_BY_ACTION[actionKey];
-    binding.contextIds = [contextId];
-    profile.actionContexts[actionKey] = [contextId];
-    contextAssignments[actionKey] = contextId;
+    const contextIds = completeContextIds(contextId, workspace.contextCatalog);
+    binding.contextIds = contextIds;
+    if (core.isDefaultContextIds(contextIds, workspace.contextCatalog)) {
+      delete profile.actionContexts[actionKey];
+    } else {
+      profile.actionContexts[actionKey] = contextIds;
+    }
+    contextAssignments[actionKey] = contextIds;
 
     const inferredMode = inferredGameMode(actionKey);
     if (inferredMode) {

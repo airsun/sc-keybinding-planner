@@ -136,10 +136,15 @@ function testWorkspaceMigration() {
   assert.equal(migrated.profiles.flight.bindings.valid_action.note, "keep me");
   assert.equal(migrated.profiles.flight.bindings.valid_action.locked, true);
   assert.equal(migrated.profiles.flight.bindings.valid_action.activationMode, "DEFAULT");
-  assert.deepEqual(migrated.profiles.flight.bindings.valid_action.contextIds, ["global"]);
+  assert.deepEqual(migrated.profiles.flight.bindings.valid_action.contextIds, core.DEFAULT_CONTEXT_IDS);
   assert.deepEqual(migrated.profiles.flight.actionModes, { valid_action: "DOUBLE_TAP" });
   assert.deepEqual(migrated.profiles.flight.actionContexts, {});
-  assert.equal(migrated.contextCatalog.mining.exclusiveGroup, "operator-mode");
+  assert.equal(migrated.semanticRevision, 2);
+  assert.equal(migrated.contextCatalog.pilot.dimension, "position");
+  assert.equal(migrated.contextCatalog.mining.dimension, "tool-mode");
+  assert.equal(migrated.contextCatalog.normal.dimension, "focus");
+  assert.equal(migrated.contextCatalog.flight, undefined);
+  assert.equal(migrated.contextCatalog.vehicle, undefined);
   assert.equal(migrated.profiles.ground.bindings.ground_action.activationMode, "LONG_PRESS");
   assert.equal(migrated.profiles.flight.repairQueue.length, 1);
   assert.equal(migrated.profiles.ground.repairQueue.length, 0);
@@ -175,7 +180,7 @@ function testRepairResolution() {
   assert.equal(resolved.profiles.flight.repairQueue.length, 0);
   assert.equal(resolved.profiles.flight.bindings.canopy_open.actionKey, "canopy_open");
   assert.equal(resolved.profiles.flight.bindings.canopy_open.activationMode, "DOUBLE_TAP");
-  assert.deepEqual(resolved.profiles.flight.bindings.canopy_open.contextIds, ["global"]);
+  assert.deepEqual(resolved.profiles.flight.bindings.canopy_open.contextIds, core.DEFAULT_CONTEXT_IDS);
   assert.deepEqual(resolved.profiles.flight.bindings.canopy_open.slot, issue.binding.slot);
   assert.equal(resolved.profiles.flight.bindings.canopy_open.note, "ambiguous");
   assert.deepEqual(resolved.profiles.ground, migrated.profiles.ground);
@@ -224,16 +229,21 @@ function testContextRelationships() {
     canonicalActionKey: "weapon_fire",
     slot,
     activationMode: "DEFAULT",
-    contextIds: ["flight"],
+    contextIds: ["pilot", "vehicle-weapons", "normal"],
   };
 
-  assert.deepEqual(core.normalizeContextIds(undefined, catalog), ["global"]);
+  assert.deepEqual(core.normalizeContextIds(undefined, catalog), core.DEFAULT_CONTEXT_IDS);
   assert.deepEqual(core.normalizeContextIds(["mining", "mining", "unknown"], catalog), ["mining"]);
   assert.deepEqual(core.normalizeContextIds(["mining", "global"], catalog), ["global"]);
+  assert.deepEqual(core.normalizeContextIds(["pilot", "turret", "mfd"], catalog), ["pilot", "mfd"]);
+  assert.equal(core.isDefaultContextIds(core.DEFAULT_CONTEXT_IDS, catalog), true);
+  assert.equal(core.isDefaultContextIds(["global"], catalog), false);
   assert.equal(core.areContextSetsExclusive(["mining"], ["salvage"], catalog), true);
   assert.equal(core.areContextSetsExclusive(["global"], ["mining"], catalog), false);
-  assert.equal(core.areContextSetsExclusive(["mining", "salvage"], ["flight", "missile"], catalog), true);
-  assert.equal(core.areContextSetsExclusive(["mining", "salvage"], ["flight", "salvage"], catalog), false);
+  assert.equal(core.areContextSetsExclusive(["pilot", "mining"], ["turret", "mining"], catalog), true);
+  assert.equal(core.areContextSetsExclusive(["pilot", "mining"], ["pilot", "salvage"], catalog), true);
+  assert.equal(core.areContextSetsExclusive(["pilot"], ["mining"], catalog), false);
+  assert.equal(core.areContextSetsExclusive(["pilot", "mining"], ["pilot", "mining", "mfd"], catalog), false);
 
   assert.equal(core.classifyBindingRelationship(base, {
     ...base,
@@ -264,6 +274,46 @@ function testContextRelationships() {
     canonicalActionKey: "other",
     slot: { ...slot, control: "TRG2" },
   }, catalog), "different-slot");
+}
+
+function testLegacyContextSemanticMigration() {
+  const workspace = {
+    schemaVersion: 4,
+    semanticRevision: 1,
+    activeProfileId: "default",
+    contextCatalog: {
+      global: { id: "global", label: "GLOBAL", exclusiveGroup: "" },
+      flight: { id: "flight", label: "Flight", exclusiveGroup: "operator-mode" },
+      vehicle: { id: "vehicle", label: "Vehicle", exclusiveGroup: "control-domain" },
+      mining: { id: "mining", label: "Mining", exclusiveGroup: "operator-mode" },
+    },
+    profiles: {
+      default: {
+        id: "default",
+        name: "Default",
+        actionContexts: {
+          flight_action: ["flight"],
+          vehicle_action: ["vehicle"],
+        },
+        bindings: {
+          default_action: { actionKey: "default_action", contextIds: ["global"] },
+          flight_action: { actionKey: "flight_action", contextIds: ["flight"] },
+          vehicle_action: { actionKey: "vehicle_action", contextIds: ["vehicle"] },
+        },
+      },
+    },
+  };
+
+  const migrated = core.migrateWorkspace(workspace);
+  assert.equal(migrated.semanticRevision, 2);
+  assert.deepEqual(migrated.profiles.default.bindings.default_action.contextIds, core.DEFAULT_CONTEXT_IDS);
+  assert.deepEqual(migrated.profiles.default.bindings.flight_action.contextIds, ["pilot"]);
+  assert.deepEqual(migrated.profiles.default.bindings.vehicle_action.contextIds, ["ground-vehicle"]);
+  assert.deepEqual(migrated.profiles.default.actionContexts, {
+    flight_action: ["pilot"],
+    vehicle_action: ["ground-vehicle"],
+  });
+  assert.deepEqual(core.migrateWorkspace(migrated), migrated, "CTX semantic migration must be idempotent");
 }
 
 function testLegacyDefaultControlLocksAreReleasedOnce() {
@@ -341,6 +391,7 @@ testWorkspaceMigration();
 testRepairResolution();
 testConflictIdentity();
 testContextRelationships();
+testLegacyContextSemanticMigration();
 testLegacyDefaultControlLocksAreReleasedOnce();
 testRealSeedInvariant();
 

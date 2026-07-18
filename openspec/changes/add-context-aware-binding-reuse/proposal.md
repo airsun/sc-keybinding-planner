@@ -10,6 +10,9 @@ The planner currently treats `Flight`, `Ground`, `Combat`, and `Mining` as separ
 - Classify same-slot relationships as `shared`, `context-reuse`, or `true-conflict` using canonical action identity, activation mode, and proven CTX exclusivity.
 - Show the classification and CTX editor in the existing card/mini-card region; only true conflicts remain in the problem filter or destructive conflict flow.
 - Add bounded responsive workspace modes for iPad Pro portrait/landscape, Sidecar, 2K, and 4K displays instead of stretching or clipping the three-column cockpit.
+- Refine the expanded card so MODE and CTX have balanced columns, every MODE is directly visible with abbreviation and full name, and CTX is organized by Position, Tool Mode, and Focus.
+- Replace the prominent `GLOBAL` peer option with a secondary `UNSCOPED` escape hatch; new/default assignments use `Pilot + Vehicle Weapons + Normal` and legacy flat CTX values migrate deterministically.
+- Show the action's read-only keybinding description and the current binding's editable note together in the expanded card without removing the existing compact-card controls.
 - Keep the current workspace-global `deviceConfig`; Device Presets are explicitly deferred.
 
 ## Capabilities

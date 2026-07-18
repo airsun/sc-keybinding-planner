@@ -20,8 +20,10 @@
 
 ### MODE 与 CTX
 
-- `MODE` 表示同一物理键在游戏绑定层的触发方式；默认值叫 `DEFAULT`，其它模式可包括 Double Tap、Long Press、Short Press 等。
-- `CTX` 表示动作只在哪个游戏上下文生效；未设置时为 `GLOBAL`。只有明确互斥的 CTX 才能证明同槽位可复用。
+- `MODE` 表示同一物理键在游戏绑定层的触发方式。展开动作卡后会显示全部 13 种 MODE，每项同时给出缩写和完整名称，点击后立即保存。
+- `CTX` 分成三个维度：`Position`（Pilot、Turret、Ground Vehicle、EVA、On Foot）、`Tool Mode`（Vehicle Weapons、Missile、Mining、Salvage）和 `Focus`（Normal、Interaction、MFD）。每个维度最多选择一项；任一共同维度明确选择不同值时，才可证明同槽位复用。
+- 默认 CTX 是 `Pilot + Vehicle Weapons + Normal`。`CLEAR CTX · UNSCOPED` 表示不限定上下文，会与任何具体 CTX 重叠，因此不能用于证明复用。
+- 展开卡片下方分别显示只读的“键位说明”和当前 Profile 中可编辑的“绑定备注”；未绑定动作仍可查看说明，但绑定后才能写备注。
 - 冲突身份由“物理槽位 + MODE”确定；MODE 不同天然共存，MODE 相同则继续依据动作身份和 CTX 判断。
 
 ## 2. 绑定语言

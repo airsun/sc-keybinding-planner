@@ -39,3 +39,11 @@
 - [x] 6.3 Add coarse-pointer touch target sizing for operation controls
 - [x] 6.4 Verify screenshots and zero horizontal/card overflow across the full matrix
 - [x] 6.5 Commit, push main, repair the Pages environment policy, and verify deployment
+
+## 7. Expanded MODE / Dimensional CTX Refinement
+
+- [x] 7.1 Add regression coverage for CTX dimension normalization, semantic-revision migration, and dimension-based reuse
+- [x] 7.2 Replace the expanded MODE dropdown with a complete abbreviation-plus-name button matrix
+- [x] 7.3 Replace flat CTX choices with balanced Position, Tool Mode, and Focus groups plus secondary UNSCOPED clearing
+- [x] 7.4 Add separate read-only keybinding description and editable binding-note regions to expanded cards
+- [x] 7.5 Update documentation and browser smoke, then run syntax, core, sync, repair, responsive, and strict OpenSpec validation

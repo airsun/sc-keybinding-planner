@@ -179,13 +179,13 @@ function smokeInjectSource() {
 
 async function serveSmokeHtml() {
   const original = await readFile(path.join(appRoot, "index.html"), "utf8");
-  const needle = '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="./app.js?v=retro-45"></script>';
-  if (!original.includes(needle)) {
+  const boundary = /(^[ \t]*<script src="\.\/sync-core\.js[^"]*"><\/script>\r?\n)(^[ \t]*<script src="\.\/app\.js[^"]*"><\/script>)/m;
+  if (!boundary.test(original)) {
     throw new Error("Unable to find sync-core/app.js script boundary in index.html");
   }
   return original.replace(
-    needle,
-    '    <script src="./sync-core.js?v=sync-1"></script>\n    <script src="/__sync-smoke-inject.js"></script>\n    <script src="./app.js?v=retro-45"></script>',
+    boundary,
+    '$1    <script src="/__sync-smoke-inject.js"></script>\n$2',
   );
 }
 
@@ -392,13 +392,44 @@ function pageExpression() {
           return Math.abs(toggleRect.right - controlsRect.right) <= 1
             && toggleRect.left >= lockRect.right - 1;
         }).length,
-      collapsedModeControlCount: document.querySelectorAll("#bindingRows .binding-card:not(.detail-expanded) .activation-mode-select").length,
-      collapsedContextControlCount: document.querySelectorAll("#bindingRows .binding-card:not(.detail-expanded) .context-picker-button").length,
+      collapsedModeControlCount: document.querySelectorAll("#bindingRows .binding-card:not(.detail-expanded) .activation-mode-field").length,
+      collapsedContextControlCount: document.querySelectorAll("#bindingRows .binding-card:not(.detail-expanded) .context-picker").length,
       floatingDetailExists: Boolean(document.querySelector("#cardDetailOverlay")),
       expandedCardCount: document.querySelectorAll("#bindingRows .binding-card.detail-expanded").length,
       expandedRowId: document.querySelector("#bindingRows .binding-card.detail-expanded")?.dataset.rowId || "",
-      inlineModeControlCount: document.querySelectorAll(".inline-card-detail .activation-mode-select").length,
-      inlineContextControlCount: document.querySelectorAll(".inline-card-detail .context-picker-button").length,
+      inlineModeControlCount: document.querySelectorAll(".inline-card-detail .activation-mode-field").length,
+      inlineModeOptionCount: document.querySelectorAll(".inline-card-detail .activation-mode-option").length,
+      visibleModeOptionCount: Array.from(document.querySelectorAll(".inline-card-detail .activation-mode-option"))
+        .filter((option) => option.getClientRects().length > 0).length,
+      modeOptionText: Array.from(document.querySelectorAll(".inline-card-detail .activation-mode-option"))
+        .map((option) => (option.textContent || "").replace(/\s+/g, " ").trim()),
+      inlineContextControlCount: document.querySelectorAll(".inline-card-detail .context-picker").length,
+      inlineContextDimensionCount: document.querySelectorAll(".inline-card-detail .context-dimension").length,
+      inlineContextOptionCount: document.querySelectorAll(".inline-card-detail .context-option").length,
+      visibleContextOptionCount: Array.from(document.querySelectorAll(".inline-card-detail .context-option"))
+        .filter((option) => option.getClientRects().length > 0).length,
+      selectedContextIds: Array.from(document.querySelectorAll('.inline-card-detail .context-option[aria-pressed="true"]'))
+        .map((option) => option.dataset.contextId || ""),
+      turretContextOption: (() => {
+        const option = document.querySelector('.inline-card-detail .context-option[data-context-id="turret"]');
+        return option ? {
+          text: option.textContent || "",
+          pressed: option.getAttribute("aria-pressed") || "",
+          visible: option.getClientRects().length > 0,
+        } : null;
+      })(),
+      contextClearVisible: Boolean(document.querySelector(".inline-card-detail .context-clear")?.getClientRects().length),
+      balancedSettingsColumns: (() => {
+        const mode = document.querySelector(".inline-card-detail .activation-mode-field")?.getBoundingClientRect();
+        const context = document.querySelector(".inline-card-detail .context-picker")?.getBoundingClientRect();
+        if (!mode || !context) return false;
+        return Math.abs(mode.width - context.width) <= 1;
+      })(),
+      informationPanelCount: document.querySelectorAll(".inline-card-detail .inline-information-panel").length,
+      inlineDescription: document.querySelector(".inline-card-detail .inline-description-panel")?.textContent || "",
+      inlineNoteDisabled: Boolean(document.querySelector(".inline-card-detail .inline-binding-note")?.disabled),
+      inlineNoteValue: document.querySelector(".inline-card-detail .inline-binding-note")?.value || "",
+      scenario1BindingNote: workspace.profiles?.default?.bindings?.pc_interaction_select?.note || "",
       inlinePosition: document.querySelector(".inline-detail-position")?.textContent || "",
       inlineDirection: document.querySelector("#bindingRows .binding-card.detail-expanded")?.dataset.detailDirection || "",
       previousDisabled: Boolean(document.querySelector('[data-inline-detail-command="previous"]')?.disabled),
@@ -493,9 +524,7 @@ function pageExpression() {
   };
   const setRowContext = async (rowId, actionKey, contextId) => {
     await openDetail(rowId);
-    click(".inline-card-detail .context-picker-button");
-    setChecked(\`.inline-card-detail .context-option input[value="\${contextId}"]\`, true);
-    click(".inline-card-detail .context-picker-actions .primary");
+    click(\`.inline-card-detail .context-option[data-context-id="\${contextId}"]\`);
     await waitFor(
       (current) => current.defaultActionContexts[actionKey]?.includes(contextId),
       \`set context \${contextId} on \${rowId}\`,
@@ -664,18 +693,51 @@ function pageExpression() {
 
   await openDetail("scenario-1");
   if (state().inlineModeControlCount !== 1
+    || state().inlineModeOptionCount !== 13
+    || state().visibleModeOptionCount !== 13
+    || !state().modeOptionText.includes("DEFDEFAULT")
+    || !state().modeOptionText.includes("DHNDELAYED HOLD NO RETRIGGER")
     || state().inlineContextControlCount !== 1
+    || state().inlineContextDimensionCount !== 3
+    || state().inlineContextOptionCount !== 12
+    || state().visibleContextOptionCount !== 12
+    || !state().turretContextOption?.visible
+    || !state().turretContextOption?.text.includes("Turret")
+    || !state().contextClearVisible
+    || !state().balancedSettingsColumns
+    || state().informationPanelCount !== 2
+    || !state().inlineDescription.includes("MFD context")
+    || state().inlineNoteDisabled
     || !state().previousDisabled
     || state().detailStatePersisted) {
-    throw new Error("Inline detail must expose one MODE/CTX editor and a first-row boundary: " + JSON.stringify(state()));
+    throw new Error("Inline detail must balance complete MODE/CTX controls and binding information: " + JSON.stringify(state()));
   }
-  select(".inline-card-detail .activation-mode-select", "DOUBLE_TAP");
+  fill(".inline-card-detail .inline-binding-note", "展开卡片备注");
+  await waitFor(
+    (current) => current.scenario1BindingNote === "展开卡片备注"
+      && current.inlineNoteValue === "展开卡片备注",
+    "expanded binding note persistence",
+  );
+  click('.inline-card-detail .context-option[data-context-id="turret"]');
+  await waitFor(
+    (current) => current.defaultActionContexts.pc_interaction_select?.includes("turret")
+      && current.turretContextOption?.pressed === "true"
+      && JSON.stringify(current.selectedContextIds) === JSON.stringify(["turret", "vehicle-weapons", "normal"]),
+    "single-click Turret CTX assignment",
+  );
+  click('.inline-card-detail .context-clear');
+  await waitFor(
+    (current) => JSON.stringify(current.defaultActionContexts.pc_interaction_select) === JSON.stringify(["global"])
+      && JSON.stringify(current.selectedContextIds) === JSON.stringify([]),
+    "single-click UNSCOPED CTX clear",
+  );
+  click('.inline-card-detail .activation-mode-option[data-mode="DOUBLE_TAP"]');
   await waitFor(
     (current) => current.scenario1ModeBadge?.text === "2T"
       && current.scenario1ModeBadge.mode === "DOUBLE_TAP",
     "mode badge follows inline MODE change",
   );
-  select(".inline-card-detail .activation-mode-select", "DEFAULT");
+  click('.inline-card-detail .activation-mode-option[data-mode="DEFAULT"]');
   await waitFor(
     (current) => current.scenario1ModeBadge?.text === "DEF"
       && current.scenario1ModeBadge.mode === "DEFAULT",
@@ -699,6 +761,12 @@ function pageExpression() {
     (current) => current.expandedCardCount === 0 && current.selectedCardRowId === "scenario-2",
     "collapse inline detail",
   );
+  await openDetail("scenario-112");
+  if (!state().inlineNoteDisabled || !state().inlineDescription.includes("不上杆")) {
+    throw new Error("Unbound detail must retain description and disable binding note: " + JSON.stringify(state()));
+  }
+  click('[data-inline-detail-command="collapse"]');
+  await waitFor((current) => current.expandedCardCount === 0, "collapse unbound inline detail");
   record("inline detail navigation synchronized");
 
   await openDetail("scenario-1");
@@ -888,7 +956,7 @@ function responsiveGeometryExpression() {
       const relationshipCards = Array.from(document.querySelectorAll(".conflict-mini-card"));
       const collapsedCards = Array.from(document.querySelectorAll(".binding-card:not(.detail-expanded)"));
       const touchControls = Array.from(document.querySelectorAll(
-        ".activation-mode-select, .context-picker-button, [data-filter], .tab-button, .conflict-mini-action, .inline-detail-nav",
+        ".activation-mode-option, .context-option, .context-clear, [data-filter], .tab-button, .conflict-mini-action, .inline-detail-nav",
       )).filter((element) => element.getClientRects().length > 0);
       const detail = document.querySelector(".inline-card-detail");
       const expandedCard = detail?.closest(".binding-card") || null;
@@ -1230,7 +1298,7 @@ async function verifyDefaultControlsRemainEditable(cdp, url) {
       };
     })()
   `);
-  if (migrated.semanticRevision !== 1
+  if (migrated.semanticRevision !== 2
     || migrated.lockedBindings.length
     || migrated.lockedCards.length
     || migrated.lockedControlSlots.length
