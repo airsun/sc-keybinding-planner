@@ -434,7 +434,7 @@ function pageExpression() {
       inlineDirection: document.querySelector("#bindingRows .binding-card.detail-expanded")?.dataset.detailDirection || "",
       previousDisabled: Boolean(document.querySelector('[data-inline-detail-command="previous"]')?.disabled),
       nextDisabled: Boolean(document.querySelector('[data-inline-detail-command="next"]')?.disabled),
-      detailStatePersisted: Object.keys(workspace.uiSettings || {}).some((key) => /detail|expanded|transition/i.test(key)),
+      detailStatePersisted: Object.keys(workspace.uiSettings || {}).some((key) => /detail|expanded|transition|edit.?position|anchor|scroll/i.test(key)),
       highlightStatePersisted: Object.keys(workspace.uiSettings || {}).some((key) => /pulse|current|arrival|highlight|selectionCause|revision/i.test(key)),
       selectedCardRowId: document.querySelector("#bindingRows .binding-card.selected")?.dataset.rowId || "",
       currentStickSlotCount: document.querySelectorAll(".stick-panel .slot.current").length,
@@ -456,6 +456,11 @@ function pageExpression() {
           active: button.classList.contains("active"),
         })),
       cardWrapScrollTop: $("#cardWrap").scrollTop,
+      selectedCardTopOffset: (() => {
+        const wrap = $("#cardWrap").getBoundingClientRect();
+        const selected = document.querySelector("#bindingRows .binding-card.selected")?.getBoundingClientRect();
+        return selected ? selected.top - wrap.top : null;
+      })(),
       selectedRowCentered: (() => {
         const wrap = $("#cardWrap").getBoundingClientRect();
         const selected = document.querySelector("#bindingRows .binding-card.selected")?.getBoundingClientRect();
@@ -514,6 +519,7 @@ function pageExpression() {
     );
   };
   const openDetail = async (rowId) => {
+    if (state().expandedRowId === rowId) return;
     click(\`[data-row-id="\${rowId}"] [data-inline-detail-command="toggle"]\`);
     await waitFor(
       (current) => current.expandedCardCount === 1
@@ -627,14 +633,26 @@ function pageExpression() {
     "repeated action row keeps its own selected card and shared exact slot",
   );
   click('[data-row-id="scenario-3"] .card-action');
+  await openDetail("scenario-3");
+  await sleep(260);
+  const scenario3TopOffset = state().selectedCardTopOffset;
 
   click("#gameTab");
   await waitFor(
-    (current) => current.selectedCardRowId === "game-38" && currentSlotIs(current, "left", "C1_press"),
-    "list mode maps exact action key",
+    (current) => current.selectedCardRowId === "game-38"
+      && current.expandedRowId === "game-38"
+      && currentSlotIs(current, "left", "C1_press"),
+    "list mode maps exact action key and expansion",
   );
   click("#scenarioTab");
-  await waitFor((current) => current.selectedCardRowId === "scenario-3", "scenario list restores exact action key row");
+  await waitFor(
+    (current) => current.selectedCardRowId === "scenario-3"
+      && current.expandedRowId === "scenario-3"
+      && Math.abs(current.selectedCardTopOffset - scenario3TopOffset) <= 2,
+    "scenario list restores exact action key row and position",
+  );
+  click('[data-inline-detail-command="collapse"]');
+  await waitFor((current) => current.expandedCardCount === 0, "collapse mapped list detail");
 
   click('[data-row-id="scenario-28"] .card-action');
   await waitFor((current) => currentSlotIs(current, "right", "main_y"), "axis selection becomes current");
@@ -666,6 +684,9 @@ function pageExpression() {
     (current) => current.selectedCardRowId === "scenario-112" && current.currentStickSlotCount === 0,
     "unbound selection has no current stick slot",
   );
+  $("#cardWrap").scrollTop = $("#cardWrap").scrollHeight;
+  await waitFor((current) => current.cardWrapScrollTop > 0, "move selected edit card within scroll container");
+  const scenario112TopOffset = state().selectedCardTopOffset;
   fill("#searchInput", "__no_visible_selection__");
   await waitFor(
     (current) => !current.selectedCardRowId && !current.selectedRowId && current.currentStickSlotCount === 0,
@@ -679,13 +700,24 @@ function pageExpression() {
     throw new Error("Hardware click must not mutate a hidden operation: " + JSON.stringify(state()));
   }
   fill("#searchInput", "");
+  await waitFor(
+    (current) => current.selectedCardRowId === "scenario-112"
+      && Math.abs(current.selectedCardTopOffset - scenario112TopOffset) <= 2,
+    "search restores hidden edit card and position",
+  );
   click('[data-row-id="scenario-1"] .card-action');
+  const scenario1FilterTopOffset = state().selectedCardTopOffset;
   click('[data-filter="unbound"]');
   await waitFor(
     (current) => !current.selectedCardRowId && !current.selectedRowId && current.currentStickSlotCount === 0,
     "status filter clears hidden selection",
   );
   click('[data-filter="all"]');
+  await waitFor(
+    (current) => current.selectedCardRowId === "scenario-1"
+      && Math.abs(current.selectedCardTopOffset - scenario1FilterTopOffset) <= 2,
+    "status filter restores hidden edit card and position",
+  );
   if (state().highlightStatePersisted) {
     throw new Error("Highlight presentation state must not persist: " + JSON.stringify(state()));
   }
@@ -770,6 +802,8 @@ function pageExpression() {
   record("inline detail navigation synchronized");
 
   await openDetail("scenario-1");
+  await sleep(260);
+  const expandedScenario1TopOffset = state().selectedCardTopOffset;
   click('[data-filter="unbound"]');
   await waitFor(
     (current) => current.expandedCardCount === 0 && current.historicalCardCount > 0,
@@ -779,7 +813,13 @@ function pageExpression() {
   await waitFor((current) => current.expandedCardCount === 0 && current.historicalCardCount === 0, "detail stays closed on empty result");
   fill("#searchInput", "");
   click('[data-filter="all"]');
-  await waitFor((current) => current.historicalCardCount > 0, "restore rows after empty result");
+  await waitFor(
+    (current) => current.expandedRowId === "scenario-1"
+      && current.selectedCardRowId === "scenario-1"
+      && Math.abs(current.selectedCardTopOffset - expandedScenario1TopOffset) <= 2
+      && !current.detailStatePersisted,
+    "restore expanded edit card and position after empty result",
+  );
 
   await setRowContext("scenario-1", "pc_interaction_select", "interaction");
   await setRowContext("scenario-69", "v_mfd_soft_select_mfd_primary_short", "mfd");

@@ -13,6 +13,7 @@ The planner currently treats `Flight`, `Ground`, `Combat`, and `Mining` as separ
 - Refine the expanded card so MODE and CTX have balanced columns, every MODE is directly visible with abbreviation and full name, and CTX is organized by Position, Tool Mode, and Focus.
 - Replace the prominent `GLOBAL` peer option with a secondary `UNSCOPED` escape hatch; new/default assignments use `Pilot + Vehicle Weapons + Normal` and legacy flat CTX values migrate deterministically.
 - Show the action's read-only keybinding description and the current binding's editable note together in the expanded card without removing the existing compact-card controls.
+- Preserve the current edit position as transient navigation state so search, filtering, or list changes can temporarily hide a card and restore the same action, expansion, and card position when it becomes visible again.
 - Keep the current workspace-global `deviceConfig`; Device Presets are explicitly deferred.
 
 ## Capabilities

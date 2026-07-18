@@ -103,6 +103,24 @@ The system SHALL show the action description as read-only reference content and 
 - **WHEN** no binding exists for the action
 - **THEN** the description remains visible and the note field clearly indicates that a binding is required
 
+### Requirement: Temporary view changes preserve edit position
+
+The planner SHALL keep the current edit location as non-persisted presentation state while search, filtering, or list navigation temporarily changes which operation cards are rendered.
+
+#### Scenario: Search temporarily hides an expanded card
+- **WHEN** the user edits an expanded operation card, enters a search that hides it, and then clears or changes the search so the action is visible
+- **THEN** the same action is selected and expanded again at its prior relative position in the operation scroll container
+- **AND** the hidden action cannot be mutated through a hardware-slot click while it is absent
+
+#### Scenario: List tab shows the canonical action in another row
+- **WHEN** the user switches between scenario and game lists while editing an action represented in both lists
+- **THEN** the visible canonical action row inherits the edit selection and expansion
+- **AND** returning to the original list restores the preferred original row and card position
+
+#### Scenario: Edit position remains presentation-only
+- **WHEN** search, filtering, or list navigation records or restores an edit position
+- **THEN** no edit-anchor, expanded-card, transition, or scroll-position field is added to the workspace, export, or sync payload
+
 ### Requirement: Workspace is bounded across target displays
 The system SHALL provide explicit responsive workspace modes for phone, iPad Pro portrait, iPad Pro landscape or Sidecar, 2K, and 4K displays without viewport-dependent font scaling.
 

@@ -47,3 +47,10 @@
 - [x] 7.3 Replace flat CTX choices with balanced Position, Tool Mode, and Focus groups plus secondary UNSCOPED clearing
 - [x] 7.4 Add separate read-only keybinding description and editable binding-note regions to expanded cards
 - [x] 7.5 Update documentation and browser smoke, then run syntax, core, sync, repair, responsive, and strict OpenSpec validation
+
+## 8. Edit Position Restoration
+
+- [x] 8.1 Add browser regressions for search, filter, and list-tab restoration plus presentation-state non-persistence
+- [x] 8.2 Implement a transient canonical edit anchor with preferred row, expansion, and relative card-position restoration
+- [x] 8.3 Update user documentation and run syntax, core, sync, repair, browser, responsive, and strict OpenSpec validation
+- [x] 8.4 Commit, push main, and verify the GitHub Pages deployment workflow

@@ -77,6 +77,12 @@ The expanded settings region uses two equal-weight columns. MODE becomes a compl
 
 A second row keeps two different information sources explicit: the action description is read-only game/reference data, while the binding note is editable Profile data. Unbound actions still show the description but cannot store a binding note until assigned. The compact card note affordance and the existing selected-action note input remain available and stay synchronized.
 
+### Preserve edit position as a transient navigation anchor
+
+The application keeps one in-memory edit anchor containing the canonical action key, preferred row id and list, whether the card is expanded, and the card's top offset inside the operation scroll container. Search, status filters, and list tabs may make that row temporarily absent from the rendered result without destroying the anchor. When a matching row becomes visible again, the application restores selection, expansion, and the measured offset after rendering. A canonical action match permits the equivalent row in the other list to inherit the edit position while the preferred row remains the return target for its original list.
+
+The anchor is presentation state only. It is replaced when the user deliberately edits another card and invalidated when the active Profile or workspace object changes. It is never written to `uiSettings`, exports, or sync payloads, and a hidden action is not considered selected for hardware mutation while it is absent from the current result.
+
 ### Use bounded responsive workspace modes
 
 The workspace uses three explicit layout bands. Up to `1180px`, the action list becomes the first full-width region and the two stick panels follow in a two-column controller rail, stacking below `700px`. From `1181px` through `1919px`, the three-column cockpit remains visible with bounded `280-320px` stick panels. At `1920px` and above, the workspace is centered and capped at `2400px` with bounded `360-400px` stick panels.
@@ -90,6 +96,7 @@ Coarse-pointer devices receive larger interaction targets without changing font 
 - [Multiple selected contexts become ambiguous] -> Permit at most one value per dimension and require an explicit mismatch in a shared dimension before allowing reuse.
 - [Existing exports change shape] -> Keep schema v4, advance the semantic revision, and migrate legacy defaults and flat ids deterministically while preserving all prior fields.
 - [Dense cards become crowded] -> Use equal MODE/CTX matrices and stack them only below the measured card-container threshold.
+- [A stale edit anchor unexpectedly reopens old work] -> Replace it on deliberate card selection, clear it on Profile/workspace changes, and restore only when its canonical action is visible.
 - [Legacy CSS overrides conflict across breakpoints] -> Add one final responsive contract layer with stronger, scoped selectors and verify computed geometry at every target viewport.
 
 ## Migration Plan

@@ -169,6 +169,9 @@
   let detailTransitionDirection = null;
   let detailTransitionLocked = false;
   let pendingExpandedScrollRowId = null;
+  let editPositionAnchor = null;
+  let restoreEditPositionOnNextVisible = false;
+  let editPositionScrollFrame = null;
   let searchText = "";
   let codeEditTarget = null;
   let helpOpen = false;
@@ -430,6 +433,7 @@
   function applyPulledWorkspace(nextState, remoteSha) {
     state = nextState;
     selectedRowId = findRow(state.uiSettings.selectedRowId)?.id || null;
+    resetTransientEditPosition();
     saveState();
     saveSyncConfig({
       ...syncConfig,
@@ -802,6 +806,7 @@
 
   function setActiveProfile(profileId) {
     if (!state.profiles?.[profileId] || profileId === state.activeProfileId) return;
+    resetTransientEditPosition();
     state.activeProfileId = profileId;
     saveState();
     render({ revealSelection: true, pulseSelection: true });
@@ -845,6 +850,7 @@
         repairQueue: source.repairQueue,
       },
     );
+    resetTransientEditPosition();
     state.activeProfileId = id;
     dom.profileDialog.close();
     saveState();
@@ -889,6 +895,7 @@
     }
     const currentIndex = ids.indexOf(profileId);
     const fallbackId = ids[currentIndex + 1] || ids[currentIndex - 1] || ids.find((id) => id !== profileId);
+    resetTransientEditPosition();
     delete state.profiles[profileId];
     state.activeProfileId = fallbackId;
     saveState();
@@ -906,6 +913,145 @@
 
   function findRow(rowId) {
     return allRows().find((row) => row.id === rowId) || null;
+  }
+
+  function rowListType(row) {
+    if (!row) return state.uiSettings.activeList === "game" ? "game" : "scenario";
+    return row.listType === "game" ? "game" : "scenario";
+  }
+
+  function currentListType() {
+    return state.uiSettings.activeList === "game" ? "game" : "scenario";
+  }
+
+  function editAnchorIsCurrent() {
+    return Boolean(
+      editPositionAnchor
+      && editPositionAnchor.profileId === state.activeProfileId
+      && editPositionAnchor.stateRef === state,
+    );
+  }
+
+  function clearEditPositionAnchor() {
+    editPositionAnchor = null;
+    restoreEditPositionOnNextVisible = false;
+  }
+
+  function resetTransientEditPosition() {
+    closeInlineDetailState();
+    clearEditPositionAnchor();
+  }
+
+  function cardTopOffset(rowId) {
+    const card = rowId ? dom.rows.querySelector(`[data-row-id="${rowId}"]`) : null;
+    if (!card) return null;
+    const wrapRect = dom.cardWrap.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+    return cardRect.top - wrapRect.top;
+  }
+
+  function rememberEditPosition(row, options = {}) {
+    if (!row) return;
+    const listType = rowListType(row);
+    const measuredOffset = cardTopOffset(row.id);
+    const sameAction = editAnchorIsCurrent() && editPositionAnchor.actionKey === row.actionKey;
+    const previousPositions = sameAction ? editPositionAnchor.positions : {};
+    const previousPosition = previousPositions[listType] || {};
+    const topOffset = Number.isFinite(measuredOffset)
+      ? measuredOffset
+      : (Number.isFinite(previousPosition.topOffset) ? previousPosition.topOffset : null);
+    editPositionAnchor = {
+      actionKey: row.actionKey,
+      profileId: state.activeProfileId,
+      stateRef: state,
+      expanded: options.expanded ?? (expandedRowId === row.id),
+      lastTopOffset: Number.isFinite(topOffset)
+        ? topOffset
+        : (sameAction ? editPositionAnchor.lastTopOffset : null),
+      positions: {
+        ...previousPositions,
+        [listType]: { rowId: row.id, topOffset },
+      },
+    };
+    if (!options.keepPendingRestore) restoreEditPositionOnNextVisible = false;
+  }
+
+  function captureEditPositionCardOffset() {
+    if (!editAnchorIsCurrent()) {
+      clearEditPositionAnchor();
+      return false;
+    }
+    const listType = currentListType();
+    const currentPosition = editPositionAnchor.positions[listType] || {};
+    const candidateIds = [expandedRowId, selectedRowId, currentPosition.rowId].filter(Boolean);
+    const rowId = candidateIds.find((candidateId) => {
+      const row = findRow(candidateId);
+      return row?.actionKey === editPositionAnchor.actionKey && Number.isFinite(cardTopOffset(candidateId));
+    });
+    if (!rowId) return false;
+    const topOffset = cardTopOffset(rowId);
+    editPositionAnchor.positions[listType] = { rowId, topOffset };
+    editPositionAnchor.lastTopOffset = topOffset;
+    editPositionAnchor.expanded = expandedRowId === rowId;
+    return true;
+  }
+
+  function prepareEditPositionForViewChange() {
+    captureEditPositionCardOffset();
+    if (editAnchorIsCurrent()) restoreEditPositionOnNextVisible = true;
+  }
+
+  function editPositionEntry(entries) {
+    if (!editAnchorIsCurrent()) {
+      if (editPositionAnchor) clearEditPositionAnchor();
+      return null;
+    }
+    const position = editPositionAnchor.positions[currentListType()] || {};
+    return entries.find(({ row }) => row.id === position.rowId && row.actionKey === editPositionAnchor.actionKey)
+      || entries.find(({ row }) => row.actionKey === editPositionAnchor.actionKey)
+      || null;
+  }
+
+  function restoreExpandedEditPosition(entry) {
+    if (!entry || !editAnchorIsCurrent() || entry.row.actionKey !== editPositionAnchor.actionKey) return;
+    if (!editPositionAnchor.expanded) return;
+    const needsRestore = expandedRowId !== entry.row.id
+      || expandedProfileId !== state.activeProfileId
+      || expandedStateRef !== state;
+    if (!needsRestore) return;
+    expandedRowId = entry.row.id;
+    expandedProfileId = state.activeProfileId;
+    expandedStateRef = state;
+    detailTransitionDirection = null;
+    pendingExpandedScrollRowId = null;
+  }
+
+  function restoreEditCardPosition(rowId) {
+    if (!editAnchorIsCurrent()) return false;
+    const row = findRow(rowId);
+    if (!row || row.actionKey !== editPositionAnchor.actionKey) return false;
+    const card = dom.rows.querySelector(`[data-row-id="${rowId}"]`);
+    if (!card) return false;
+    const listType = currentListType();
+    const position = editPositionAnchor.positions[listType] || {};
+    const desiredOffset = Number.isFinite(position.topOffset)
+      ? position.topOffset
+      : editPositionAnchor.lastTopOffset;
+    if (Number.isFinite(desiredOffset)) {
+      const currentOffset = cardTopOffset(rowId);
+      dom.cardWrap.scrollTo({
+        top: Math.max(0, dom.cardWrap.scrollTop + currentOffset - desiredOffset),
+        behavior: "auto",
+      });
+    } else if (editPositionAnchor.expanded) {
+      syncExpandedCard(rowId);
+    }
+    editPositionAnchor.positions[listType] = {
+      rowId,
+      topOffset: Number.isFinite(desiredOffset) ? desiredOffset : cardTopOffset(rowId),
+    };
+    window.requestAnimationFrame(captureEditPositionCardOffset);
+    return true;
   }
 
   function getControl(hand, controlId) {
@@ -1658,6 +1804,7 @@
       clearPendingTarget();
       return;
     }
+    if (options.rememberEditPosition !== false) rememberEditPosition(row);
     if (!options.revealBinding) return;
     const binding = bindingForRow(row);
     if (binding?.slot) {
@@ -1669,13 +1816,22 @@
 
   function reconcileVisibleSelection(entries, options = {}) {
     let entry = selectedEntry(entries);
+    let restoringEditPosition = false;
     if (!entry && options.mapActionKey) {
       entry = entries.find(({ row }) => row.actionKey === options.mapActionKey) || null;
     }
     if (!entry) {
+      entry = editPositionEntry(entries);
+      restoringEditPosition = Boolean(entry);
+    }
+    if (!entry) {
       applySelectedRow(null);
     } else {
-      applySelectedRow(entry.row, { revealBinding: Boolean(options.revealSelection) });
+      applySelectedRow(entry.row, {
+        revealBinding: Boolean(options.revealSelection || restoringEditPosition),
+        rememberEditPosition: false,
+      });
+      restoreExpandedEditPosition(entry);
     }
 
     const nextSlotKey = entry ? slotKey(bindingForRow(entry.row)?.slot) : "";
@@ -1711,6 +1867,13 @@
     if (rowId) {
       pendingExpandedScrollRowId = null;
       window.requestAnimationFrame(() => syncExpandedCard(rowId));
+    }
+    if (restoreEditPositionOnNextVisible) {
+      const entry = editPositionEntry(entries);
+      if (entry) {
+        restoreEditPositionOnNextVisible = false;
+        window.requestAnimationFrame(() => restoreEditCardPosition(entry.row.id));
+      }
     }
     return entries;
   }
@@ -1865,6 +2028,8 @@
 
   function collapseInlineDetail() {
     if (!expandedRowId) return;
+    const row = findRow(expandedRowId);
+    if (row) rememberEditPosition(row, { expanded: false });
     closeInlineDetailState();
     render();
   }
@@ -2866,6 +3031,7 @@
           onAction: () => {
             state = nextState;
             selectedRowId = findRow(state.uiSettings.selectedRowId)?.id || null;
+            resetTransientEditPosition();
             saveState();
             render({ revealSelection: true, pulseSelection: true });
             if (pendingRepairItems().length) {
@@ -2899,13 +3065,16 @@
   }
 
   function setActiveList(listType) {
-    const previousActionKey = findRow(selectedRowId)?.actionKey || null;
+    prepareEditPositionForViewChange();
+    const previousActionKey = findRow(selectedRowId)?.actionKey
+      || (editAnchorIsCurrent() ? editPositionAnchor.actionKey : null);
     state.uiSettings.activeList = listType;
     saveState();
     render({ mapActionKey: previousActionKey, revealSelection: true, pulseSelection: true });
   }
 
   function setStatusFilter(filter) {
+    prepareEditPositionForViewChange();
     state.uiSettings.statusFilter = filter;
     saveState();
     render();
@@ -2954,9 +3123,17 @@
   }
 
   dom.search.addEventListener("input", (event) => {
+    prepareEditPositionForViewChange();
     searchText = event.target.value;
     render();
   });
+  dom.cardWrap.addEventListener("scroll", () => {
+    if (editPositionScrollFrame !== null) return;
+    editPositionScrollFrame = window.requestAnimationFrame(() => {
+      editPositionScrollFrame = null;
+      captureEditPositionCardOffset();
+    });
+  }, { passive: true });
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.addEventListener("click", () => setActiveList(button.dataset.list));
   });
