@@ -18,7 +18,16 @@ No install · Local-first · One shareable Workspace JSON
 
 A good HOSAS layout is more than a list of buttons. It is a control language shaped by your hardware, your ships, and the way you play. This planner turns that language into a visual workspace: explore operations by scenario, assign them directly on the sticks, and make shared actions, contextual reuse, and real conflicts understandable.
 
-This is currently focused on Star Citizen dual-VKB setups. It helps you plan and preserve a layout before reproducing it in the game's keybinding menus.
+This release models one specific dual-stick VKB setup: a [Gladiator NXT EVO ‘Space Combat Edition’ - Right Hand](https://vkbsimcontrollers.com/products/gladiator-nxt-evo-space-combat-edition-right-hand-us) paired with a [Gladiator NXT EVO Omni Throttle - Left Hand](https://vkbsimcontrollers.com/products/gladiator-nxt-evo-omni-throttle-left-hand-us). It helps you plan and preserve a layout before reproducing it in the game's keybinding menus.
+
+## 当前适配的设备
+
+当前界面的摇杆布局、物理槽位与按键模型，以这套双摇杆（HOSAS）组合为设计基准：
+
+- 右手：[VKB Gladiator NXT EVO ‘Space Combat Edition’ - Right Hand](https://vkbsimcontrollers.com/products/gladiator-nxt-evo-space-combat-edition-right-hand-us)
+- 左手：[VKB Gladiator NXT EVO Omni Throttle - Left Hand](https://vkbsimcontrollers.com/products/gladiator-nxt-evo-omni-throttle-left-hand-us)
+
+因此，当前版本还不是能够在界面中一键切换任意硬件的通用摇杆配置器。其他品牌或型号可以通过二次开发适配，主要需要调整设备定义、槽位映射及相应的界面呈现。未来可能继续扩展设备预设与切换能力，但目前不作具体版本承诺。
 
 ## 为什么做这个工具
 
