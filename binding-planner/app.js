@@ -1782,9 +1782,38 @@
     return bars;
   }
 
+  function searchTextForRow(row) {
+    const binding = bindingForRow(row);
+    const slot = binding?.slot;
+    return [
+      row.nameZh,
+      row.nameEn,
+      row.description,
+      row.suggestedInput,
+      row.actionId,
+      row.actionKey,
+      row.group,
+      row.subgroup,
+      row.note,
+      binding?.note,
+      slot?.hand,
+      handLabels[slot?.hand],
+      slot?.slotType,
+      slot?.control,
+      slotLabel(slot),
+      slot?.layer,
+      layerLabels[slot?.layer],
+      codeForSlot(slot),
+      compactCodeForSlot(slot),
+    ]
+      .filter((value) => value !== null && value !== undefined && value !== "")
+      .join(" ")
+      .toLowerCase();
+  }
+
   function visibleRows(occupancyMap = occupancy()) {
     const filter = state.uiSettings.statusFilter || "all";
-    const query = searchText.trim().toLowerCase();
+    const queryTerms = searchText.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const result = [];
     for (const row of currentRows()) {
       const status = statusForRow(row, occupancyMap);
@@ -1792,8 +1821,8 @@
       if (filter === "unbound" && status.key !== "unbound") continue;
       if (filter === "locked" && status.key !== "locked") continue;
       if (filter === "issue" && status.key !== "issue") continue;
-      const haystack = `${row.nameZh} ${row.nameEn} ${row.description} ${row.suggestedInput} ${row.actionId}`.toLowerCase();
-      if (query && !haystack.includes(query)) continue;
+      const haystack = searchTextForRow(row);
+      if (queryTerms.some((term) => !haystack.includes(term))) continue;
       result.push({ row, status });
     }
     return result;
