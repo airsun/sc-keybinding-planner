@@ -1782,10 +1782,15 @@
     return bars;
   }
 
-  function searchTextForRow(row) {
-    const binding = bindingForRow(row);
-    const slot = binding?.slot;
-    return [
+  function joinSearchValues(values) {
+    return values
+      .filter((value) => value !== null && value !== undefined && value !== "")
+      .join(" ")
+      .toLowerCase();
+  }
+
+  function actionSearchTextForRow(row) {
+    return joinSearchValues([
       row.nameZh,
       row.nameEn,
       row.description,
@@ -1793,6 +1798,13 @@
       row.actionKey,
       row.group,
       row.subgroup,
+    ]);
+  }
+
+  function bindingSearchTextForRow(row) {
+    const binding = bindingForRow(row);
+    const slot = binding?.slot;
+    return joinSearchValues([
       binding?.note,
       slot?.hand,
       handLabels[slot?.hand],
@@ -1803,15 +1815,58 @@
       layerLabels[slot?.layer],
       codeForSlot(slot),
       compactCodeForSlot(slot),
-    ]
-      .filter((value) => value !== null && value !== undefined && value !== "")
-      .join(" ")
-      .toLowerCase();
+    ]);
+  }
+
+  function bindingSearchAliases() {
+    const aliases = new Set([...layers, ...Object.values(layerLabels)].map((value) => value.toLowerCase()));
+    const addAlias = (value) => {
+      const normalized = String(value ?? "").trim().toLowerCase();
+      if (!normalized) return;
+      aliases.add(normalized);
+      aliases.add(normalized.replace(/^#/, ""));
+    };
+    for (const [hand, handConfig] of Object.entries(state.deviceConfig.hands || {})) {
+      addAlias(hand);
+      addAlias(handLabels[hand]);
+      addAlias(handConfig.label);
+      for (const control of handConfig.controls || []) {
+        if (control.bindable === false) continue;
+        addAlias(control.id);
+        addAlias(control.label);
+        const slots = control.kind === "axis"
+          ? [{ slotType: "axis", hand, control: control.id }]
+          : (control.shiftCapable ? layers : ["base"]).map((layer) => ({
+            slotType: "button",
+            hand,
+            control: control.id,
+            layer,
+          }));
+        for (const slot of slots) {
+          addAlias(codeForSlot(slot));
+          addAlias(compactCodeForSlot(slot));
+        }
+      }
+    }
+    return aliases;
+  }
+
+  function isBindingOnlySearchTerm(term, aliases) {
+    if (/^#\d+$/.test(term)) return true;
+    if (/^\d+$/.test(term)) return aliases.has(term);
+    const looksLikeHardwareAlias = /\d/.test(term)
+      || /^[a-z]{2,3}$/.test(term)
+      || /[#_↑↓←→]/.test(term);
+    return looksLikeHardwareAlias && [...aliases].some((alias) => alias.startsWith(term));
   }
 
   function visibleRows(occupancyMap = occupancy()) {
     const filter = state.uiSettings.statusFilter || "all";
-    const queryTerms = searchText.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const aliases = bindingSearchAliases();
+    const queryTerms = searchText.trim().toLowerCase().split(/\s+/).filter(Boolean).map((term) => ({
+      term,
+      bindingOnly: isBindingOnlySearchTerm(term, aliases),
+    }));
     const result = [];
     for (const row of currentRows()) {
       const status = statusForRow(row, occupancyMap);
@@ -1819,8 +1874,12 @@
       if (filter === "unbound" && status.key !== "unbound") continue;
       if (filter === "locked" && status.key !== "locked") continue;
       if (filter === "issue" && status.key !== "issue") continue;
-      const haystack = searchTextForRow(row);
-      if (queryTerms.some((term) => !haystack.includes(term))) continue;
+      const actionHaystack = actionSearchTextForRow(row);
+      const bindingHaystack = bindingSearchTextForRow(row);
+      const missesQuery = queryTerms.some(({ term, bindingOnly }) => (
+        !bindingHaystack.includes(term) && (bindingOnly || !actionHaystack.includes(term))
+      ));
+      if (missesQuery) continue;
       result.push({ row, status });
     }
     return result;
